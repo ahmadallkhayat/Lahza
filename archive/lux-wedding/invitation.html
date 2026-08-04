@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>أحمد وسدرة — لحظة</title>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   LANGUAGE — resolved before paint so there is no flash of the
+   wrong direction. Preview with ?lang=ar · ?lang=ku · ?lang=en
+   ku = Sorani Kurdish (Arabic script, RTL). Kurmanji is Latin/LTR
+   and would be a fourth entry, not a variant of this one.
+   ═══════════════════════════════════════════════════════════════ */
+let LANG = (() => {
+  const q = new URLSearchParams(location.search).get('lang');
+  return ['ar', 'ku', 'en'].includes(q) ? q : 'ar';
+})();
+
+document.documentElement.lang = LANG;
+document.documentElement.dir  = LANG === 'en' ? 'ltr' : 'rtl';
+
+/* Faces per language. The couple's names and the Quranic verse are
+   Arabic in every language, so Amiri and Aref Ruqaa always load.
+
+   Kurdish deliberately does NOT use Cairo: Cairo has no glyphs for
+   ڕ ڵ ۆ ە ێ, so the browser sourced only those five letters from a
+   fallback face and the words visibly came apart. Never chain a
+   second Arabic font behind an incomplete one — mixing fonts inside
+   a single word breaks the cursive joins. Noto Sans Arabic covers
+   the whole Sorani alphabet by itself. */
+const FONTS = {
+  ar: ['Amiri:wght@400;700', 'Aref+Ruqaa:wght@400;700', 'Cairo:wght@300;400;600'],
+  ku: ['Amiri:wght@400;700', 'Aref+Ruqaa:wght@400;700', 'Noto+Sans+Arabic:wght@300;400;600'],
+  en: ['Amiri:wght@400;700', 'Aref+Ruqaa:wght@400;700', 'Cormorant+Garamond:ital,wght@0,300;0,400;1,300'],
+};
+
+const fontsLoaded = new Set();
+function ensureFonts(lang) {
+  if (fontsLoaded.has(lang)) return;
+  fontsLoaded.add(lang);
+  const link = document.createElement('link');
+  link.rel  = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=' + FONTS[lang].join('&family=') + '&display=swap';
+  document.head.appendChild(link);
+}
+ensureFonts(LANG);
+</script>
+
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   COUPLE NAME FACE
+   Drop a licensed .ttf beside this file as `thuluth.ttf` to use it.
+   Absent, it falls back to Aref Ruqaa (SIL OFL, free commercially,
+   and verified complete for Arabic and Sorani).
+   ═══════════════════════════════════════════════════════════════ */
+@font-face {
+  font-family: 'Thuluth';
+  src: url('thuluth.ttf') format('truetype');
+  font-display: swap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PALETTE — sampled from Intro_video.mp4
+   The clip opens on dark chocolate (#2a201a) and ends flooded with
+   champagne light (#dac39f), so content lands on warm ivory and the
+   video's last frame flows into the page instead of cutting to black.
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --paper:      #f7f1e8;
+  --paper-deep: #ede1d0;
+  --ink:        #2e1d16;
+  --ink-soft:   #6b5648;
+  --gold:       #a8874f;
+  --gold-deep:  #856a3c;
+  --curtain:    #1a0f0d;
+
+  --shell: 30rem;
+
+  /* Letter-spacing multiplier. Tracking pulls Arabic and Kurdish
+     letters apart and breaks their cursive joins, so it stays 0 for
+     RTL and is only switched on for Latin. */
+  --tk: 0;
+
+  --f-name:  'Thuluth', 'Aref Ruqaa', serif;
+  --f-serif: 'Amiri', serif;
+  --f-ui:    'Cairo', system-ui, sans-serif;
+  --f-latin: 'Cormorant Garamond', Georgia, serif;
+}
+
+/* Amiri covers the full Sorani alphabet, so it needs nothing behind
+   it. Noto Sans Arabic replaces Cairo, which lacks ڕ ڵ ۆ ە ێ. */
+html[lang="ku"] { --f-ui: 'Noto Sans Arabic', system-ui, sans-serif; }
+
+html[lang="en"] { --tk: 1; --f-ui: var(--f-latin); }
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-ui);
+  font-weight: 300;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(120% 80% at 50% 0%,   rgba(216,195,159,.45), transparent 60%),
+    radial-gradient(100% 70% at 50% 100%, rgba(168,135,79,.16),  transparent 65%);
+}
+
+/* ─── INTRO ──────────────────────────────────────────────────── */
+#curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--curtain);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  /* --fade is set from CONFIG.crossfadeMs so the curtain leaving and the
+     content arriving are always the same length. */
+  transition: opacity var(--fade, 1400ms) ease;
+}
+#curtain.gone { opacity: 0; pointer-events: none; }
+
+#intro {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* 16:9 footage on a portrait phone: cover crops the sides. The box
+     sits centred so it survives — switch to `contain` to letterbox. */
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+#intro.playing { opacity: 1; }
+
+#prompt { position: relative; z-index: 2; text-align: center; transition: opacity 500ms ease; }
+#prompt.gone { opacity: 0; }
+
+.ring {
+  width: 4.5rem; height: 4.5rem;
+  margin: 0 auto 1.4rem;
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+.ring::after {
+  content: '';
+  position: absolute;
+  inset: -.55rem;
+  border: 1px solid var(--gold);
+  border-radius: 50%;
+  opacity: .35;
+  animation: breathe 2.8s ease-in-out infinite;
+}
+.ring span { width: .4rem; height: .4rem; background: var(--gold); border-radius: 50%; }
+@keyframes breathe {
+  0%, 100% { transform: scale(1);    opacity: .35; }
+  50%      { transform: scale(1.18); opacity: 0;   }
+}
+
+#prompt p {
+  margin: 0;
+  color: #e8d9bd;
+  font-size: .8rem;
+  letter-spacing: calc(.34em * var(--tk));
+  font-weight: 300;
+}
+
+/* ─── CONTENT ────────────────────────────────────────────────── */
+main {
+  position: relative;
+  z-index: 1;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: clamp(3rem, 9vh, 5.5rem) 1.6rem 4.5rem;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity var(--fade, 1400ms) ease, transform var(--fade, 1400ms) ease;
+}
+main.revealed { opacity: 1; transform: none; }
+
+main.revealed > * { animation: rise 1s ease both; }
+main.revealed > *:nth-child(1) { animation-delay: .15s; }
+main.revealed > *:nth-child(2) { animation-delay: .30s; }
+main.revealed > *:nth-child(3) { animation-delay: .45s; }
+main.revealed > *:nth-child(4) { animation-delay: .60s; }
+main.revealed > *:nth-child(5) { animation-delay: .75s; }
+main.revealed > *:nth-child(6) { animation-delay: .90s; }
+main.revealed > *:nth-child(7) { animation-delay: 1.05s; }
+main.revealed > *:nth-child(8) { animation-delay: 1.20s; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+section { margin-block: 2.9rem; }
+
+.label {
+  font-size: .68rem;
+  letter-spacing: calc(.3em * var(--tk));
+  color: var(--ink-soft);
+  margin: 0 0 .55rem;
+  font-weight: 400;
+}
+
+/* ─── Verse: Arabic always, English translation small beneath ─── */
+.verse-ar {
+  font-family: var(--f-serif);
+  font-size: 1.04rem;
+  line-height: 2.15;
+  color: var(--gold-deep);
+  margin: 0 auto;
+  max-width: 25rem;
+}
+.verse-en { display: none; }
+html[lang="en"] .verse-en {
+  display: block;
+  font-family: var(--f-latin);
+  font-style: italic;
+  font-size: .84rem;
+  line-height: 1.8;
+  color: var(--ink-soft);
+  margin: .9rem auto 0;
+  max-width: 23rem;
+}
+.verse cite {
+  display: block;
+  font-family: var(--f-ui);
+  font-style: normal;
+  font-size: .66rem;
+  letter-spacing: calc(.22em * var(--tk));
+  color: var(--ink-soft);
+  margin-top: .85rem;
+}
+
+.hosts {
+  font-family: var(--f-serif);
+  font-size: .98rem;
+  line-height: 2;
+  color: var(--ink-soft);
+  margin: 0 auto;
+  max-width: 23rem;
+}
+html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.06rem; line-height: 1.85; }
+
+/* ─── Couple names: Arabic in every language ─────────────────── */
+.couple {
+  margin: 0;
+  font-family: var(--f-name);
+  font-size: clamp(2.5rem, 13vw, 3.9rem);
+  /* Thuluth and Ruqaa both throw swashes high; leading prevents clipping. */
+  line-height: 1.7;
+  color: var(--ink);
+  font-weight: 400;
+}
+.couple .amp {
+  display: block;
+  font-family: var(--f-serif);
+  font-size: .36em;
+  color: var(--gold);
+  margin-block: .1em;
+  line-height: 1;
+}
+/* Latin transliteration — English only, small, beneath each name */
+.couple .latin { display: none; }
+html[lang="en"] .couple .latin {
+  display: block;
+  font-family: var(--f-latin);
+  font-size: .26em;
+  font-style: normal;
+  letter-spacing: .22em;
+  color: var(--ink-soft);
+  margin-top: -.12em;
+  line-height: 1.6;
+}
+
+/* Gold hairline with a diamond. Symmetric, so direction-agnostic. */
+.rule {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .8rem;
+  margin: 2.2rem auto 0;
+  max-width: 13rem;
+}
+.rule::before, .rule::after { content: ''; flex: 1; height: 1px; }
+.rule::before { background: linear-gradient(to right, transparent, var(--gold)); }
+.rule::after  { background: linear-gradient(to right, var(--gold), transparent); }
+.rule i { width: .42rem; height: .42rem; background: var(--gold); transform: rotate(45deg); flex: none; }
+
+/* ─── When / where ───────────────────────────────────────────── */
+.when  { font-size: 1.45rem; margin: 0; font-weight: 400; }
+.hijri { font-size: .78rem; color: var(--ink-soft); margin: .4rem 0 0; }
+.hijri:empty { display: none; }
+.at-time { font-family: var(--f-serif); font-size: 1.7rem; color: var(--gold-deep); margin: .9rem 0 0; }
+.venue { font-size: 1.1rem; margin: 0; line-height: 1.75; }
+
+/* ─── Countdown ──────────────────────────────────────────────── */
+.countdown { display: flex; justify-content: center; gap: clamp(.5rem, 3.5vw, 1.3rem); }
+.unit {
+  flex: 1 1 0;
+  max-width: 5.4rem;
+  padding: .9rem .3rem .75rem;
+  background: var(--paper-deep);
+  border: 1px solid rgba(168,135,79,.28);
+  border-radius: .55rem;
+}
+.unit b {
+  display: block;
+  font-family: var(--f-serif);
+  font-size: 1.75rem;
+  font-weight: 400;
+  color: var(--gold-deep);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.unit small {
+  display: block;
+  font-size: .62rem;
+  letter-spacing: calc(.16em * var(--tk));
+  color: var(--ink-soft);
+  margin-top: .3rem;
+}
+.begun { font-family: var(--f-serif); font-size: 1.3rem; color: var(--gold-deep); margin: 0; }
+
+/* ─── Programme ──────────────────────────────────────────────── */
+.programme { list-style: none; margin: 0 auto; padding: 0; max-width: 20rem; text-align: start; }
+.programme li {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: .7rem 0;
+  border-bottom: 1px solid rgba(168,135,79,.2);
+}
+.programme li:last-child { border-bottom: 0; }
+.programme time {
+  flex: none;
+  width: 3.8rem;
+  font-family: var(--f-serif);
+  color: var(--gold-deep);
+  font-variant-numeric: tabular-nums;
+}
+.programme span { font-size: .98rem; }
+
+/* ─── Buttons ────────────────────────────────────────────────── */
+.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .7rem; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .8rem 1.5rem;
+  border-radius: 2rem;
+  font-family: var(--f-ui);
+  font-size: .78rem;
+  letter-spacing: calc(.13em * var(--tk));
+  text-decoration: none;
+  border: 1px solid var(--gold);
+  color: var(--gold-deep);
+  background: transparent;
+  cursor: pointer;
+  transition: background 250ms ease, color 250ms ease;
+}
+.btn:hover { background: rgba(168,135,79,.12); }
+.btn.solid { background: var(--gold); color: var(--paper); }
+.btn.solid:hover { background: var(--gold-deep); }
+.btn svg { width: .95rem; height: .95rem; stroke-width: 1.6; flex: none; }
+
+/* ─── Music toggle ───────────────────────────────────────────── */
+#mute {
+  position: fixed;
+  inset-block-end: 1.15rem;
+  inset-inline-start: 1.15rem;
+  z-index: 40;
+  width: 2.75rem; height: 2.75rem;
+  display: none;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(168,135,79,.5);
+  background: rgba(247,241,232,.85);
+  -webkit-backdrop-filter: blur(8px);   /* Safari / iOS needs the prefix */
+  backdrop-filter: blur(8px);
+  color: var(--gold-deep);
+  cursor: pointer;
+}
+#mute.on { display: grid; }
+#mute svg { width: 1.1rem; height: 1.1rem; stroke-width: 1.6; }
+
+footer {
+  margin-top: 3.5rem;
+  font-size: .7rem;
+  letter-spacing: calc(.34em * var(--tk));
+  color: var(--ink-soft);
+  opacity: .75;
+}
+
+/* ─── Preview-only language switcher. Delete for production. ─── */
+#langs {
+  position: fixed;
+  inset-block-start: .8rem;
+  inset-inline-end: .8rem;
+  z-index: 60;
+  display: flex;
+  gap: .3rem;
+  font-family: system-ui, sans-serif;
+}
+#langs a {
+  padding: .25rem .55rem;
+  font-size: .65rem;
+  letter-spacing: .08em;
+  text-decoration: none;
+  border-radius: .3rem;
+  background: rgba(46,29,22,.55);
+  color: #f7f1e8;
+}
+#langs a[aria-current] { background: var(--gold); color: #2e1d16; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- Preview switcher — remove when this becomes a real invitation -->
+<nav id="langs">
+  <a href="?lang=ar" data-lang="ar">ع</a>
+  <a href="?lang=ku" data-lang="ku">ku</a>
+  <a href="?lang=en" data-lang="en">EN</a>
+</nav>
+
+<div id="curtain">
+  <video id="intro" playsinline preload="auto" muted src="Intro_video.mp4"></video>
+  <div id="prompt">
+    <div class="ring"><span></span></div>
+    <p data-t="tap"></p>
+  </div>
+</div>
+
+<audio id="music" src="music.mp3" loop preload="auto"></audio>
+
+<button id="mute" type="button">
+  <svg id="ic-on"  viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+  <svg id="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" hidden><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
+</button>
+
+<main id="content">
+
+  <!-- The verse stays Arabic in every language; English gets a small
+       translation beneath it. lang/dir are pinned since this text is
+       Arabic even when the surrounding page is LTR. -->
+  <section class="verse">
+    <p class="verse-ar" lang="ar" dir="rtl" data-t="verse"></p>
+    <p class="verse-en" data-t="verseEn"></p>
+    <cite data-t="verseRef"></cite>
+  </section>
+
+  <section>
+    <p class="hosts" data-t="hosts"></p>
+  </section>
+
+  <section>
+    <h1 class="couple" lang="ar" dir="rtl">
+      <span class="name">أَحْمَد<em class="latin">Ahmad</em></span>
+      <span class="amp">&amp;</span>
+      <span class="name">سِدْرَة<em class="latin">Sidra</em></span>
+    </h1>
+    <div class="rule"><i></i></div>
+  </section>
+
+  <section>
+    <p class="label" data-t="dateLabel"></p>
+    <p class="when"  data-t="date"></p>
+    <p class="hijri" id="hijri"></p>
+    <p class="at-time" data-t="time"></p>
+  </section>
+
+  <section>
+    <div class="countdown" id="countdown">
+      <div class="unit"><b data-u="d">00</b><small data-t="days"></small></div>
+      <div class="unit"><b data-u="h">00</b><small data-t="hours"></small></div>
+      <div class="unit"><b data-u="m">00</b><small data-t="minutes"></small></div>
+      <div class="unit"><b data-u="s">00</b><small data-t="seconds"></small></div>
+    </div>
+    <p class="begun" id="begun" hidden data-t="begun"></p>
+  </section>
+
+  <section>
+    <p class="label" data-t="venueLabel"></p>
+    <p class="venue" data-t="venue"></p>
+  </section>
+
+  <section>
+    <p class="label" data-t="programmeLabel"></p>
+    <ul class="programme" id="programme"></ul>
+  </section>
+
+  <section class="actions">
+    <a class="btn solid" id="maps" target="_blank" rel="noopener">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      <span data-t="map"></span>
+    </a>
+    <a class="btn" id="cal" download="wedding.ics">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
+      <span data-t="calendar"></span>
+    </a>
+    <a class="btn" href="tel:+962790000000">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h3l2 5-2.5 1.5a12 12 0 0 0 6 6L16 13l5 2v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4 5.2A2 2 0 0 1 6 3z"/></svg>
+      <span data-t="call"></span>
+    </a>
+  </section>
+
+  <footer data-t="brand"></footer>
+</main>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   TUNING
+   ═══════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  // The clip carries its own AAC track. 0 = silent throughout so the
+  // music owns the moment. Raise to ~2200 to hear the box open first.
+  keepVideoAudioMs: 0,
+
+  musicFadeMs: 1600,        // music ramping up under the video
+
+  // Crossfade starts this long BEFORE the clip ends, so the video is
+  // still moving as it dissolves — no frozen frame, no hard stop.
+  //
+  // Measured from Intro_video.mp4 (240 frames, exactly 10.000s): the
+  // frame brightens from 7.5s and plateaus at ~9.25s, ending on its
+  // brightest frame (#c5ab85). 800ms puts the dissolve at 9.2s — the
+  // box is fully open and at peak champagne as it melts into the page.
+  // The clip has no dark tail, so the fade may safely outlast it; the
+  // browser holds that bright final frame until the curtain is gone.
+  fadeOutLeadMs: 800,
+  crossfadeMs: 1400,        // length of the dissolve, drives --fade
+
+  // Once the invitation is showing, the music pulls back and goes
+  // muffled — as if it moved into the next room. fogHz is the low-pass
+  // cutoff: lower is more distant. 20000 = untouched.
+  duckTo: 0.42,
+  fogHz: 700,
+  duckMs: 2600,
+
+  revealFallbackMs: 13000,  // safety net if the clip never plays at all
+};
+
+const EVENT = {
+  startsAt: '2026-12-04T19:00:00+03:00',
+  hours: 5,
+  mapQuery: 'Four Seasons Hotel Amman',
+};
+
+const VERSE_AR = 'وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا لِّتَسْكُنُوا إِلَيْهَا وَجَعَلَ بَيْنَكُم مَّوَدَّةً وَرَحْمَةً';
+
+/* ═══════════════════════════════════════════════════════════════
+   COPY
+   ⚠ The Kurdish (Sorani) strings are my best effort — have a native
+   speaker check them before this reaches a real customer.
+   ═══════════════════════════════════════════════════════════════ */
+const I18N = {
+  ar: {
+    title: 'أحمد وسدرة — لحظة',
+    numerals: 'arab',
+    tap: 'المس للفتح',
+    verse: VERSE_AR,
+    verseEn: '',
+    verseRef: 'سورة الروم — ٢١',
+    hosts: 'تتشرف عائلة السالم وعائلة الحسن بدعوتكم لحضور حفل زفاف ولديهما',
+    dateLabel: 'التاريخ',
+    date: 'الجمعة ٤ ديسمبر ٢٠٢٦',
+    time: '٧:٠٠ مساءً',
+    days: 'يوم', hours: 'ساعة', minutes: 'دقيقة', seconds: 'ثانية',
+    begun: 'بدأ الاحتفال — نراكم هناك',
+    venueLabel: 'المكان',
+    venue: 'قاعة الفورسيزونز\nعمّان، الأردن',
+    programmeLabel: 'برنامج الحفل',
+    programme: [
+      ['٧:٠٠', 'استقبال الضيوف'],
+      ['٨:٠٠', 'الزفة'],
+      ['٩:٠٠', 'العشاء'],
+      ['١٠:٣٠', 'قطع الكيكة'],
+    ],
+    map: 'الموقع على الخريطة',
+    calendar: 'أضف إلى التقويم',
+    call: 'للاستفسار',
+    brand: 'لحظة',
+    muteOn: 'كتم الموسيقى',
+    muteOff: 'تشغيل الموسيقى',
+    calSummary: 'حفل زفاف أحمد وسدرة',
+  },
+
+  ku: {
+    title: 'أحمد وسدرة — لەحزە',
+    numerals: 'arab',
+    tap: 'دەست لێبدە بۆ کردنەوە',
+    verse: VERSE_AR,            // Quran stays Arabic on Kurdish invitations
+    verseEn: '',
+    verseRef: 'سورەتی الروم — ٢١',
+    hosts: 'خێزانی ساڵم و خێزانی حەسەن بە خۆشحاڵییەوە بانگهێشتتان دەکەن بۆ ئاهەنگی هاوسەرگیری منداڵەکانیان',
+    dateLabel: 'بەروار',
+    date: 'هەینی ٤ی کانونی یەکەم ٢٠٢٦',
+    time: '٧:٠٠ ئێوارە',
+    days: 'ڕۆژ', hours: 'کاتژمێر', minutes: 'خولەک', seconds: 'چرکە',
+    begun: 'ئاهەنگ دەستی پێکرد — بەخێربێن',
+    venueLabel: 'شوێن',
+    venue: 'هۆڵی فۆرسیزنز\nعەمان، ئوردن',
+    programmeLabel: 'بەرنامەی ئاهەنگ',
+    programme: [
+      ['٧:٠٠', 'پێشوازی لە میوانان'],
+      ['٨:٠٠', 'زەفە'],
+      ['٩:٠٠', 'نانی ئێوارە'],
+      ['١٠:٣٠', 'بڕینی کێک'],
+    ],
+    map: 'شوێن لەسەر نەخشە',
+    calendar: 'زیادکردن بۆ ڕۆژژمێر',
+    call: 'بۆ زانیاری',
+    brand: 'لەحزە',
+    muteOn: 'کوژاندنی مۆسیقا',
+    muteOff: 'لێدانی مۆسیقا',
+    calSummary: 'ئاهەنگی هاوسەرگیری أحمد و سدرة',
+  },
+
+  en: {
+    title: 'Ahmad & Sidra — Lahza',
+    numerals: 'latn',
+    tap: 'TOUCH TO OPEN',
+    verse: VERSE_AR,            // original kept, translation sits beneath
+    verseEn: '“And among His signs is that He created for you mates from among yourselves, that you may find tranquility in them; and He has placed between you affection and mercy.”',
+    verseRef: 'QURAN 30:21',
+    hosts: 'The Al-Salem and Al-Hassan families request the honour of your presence at the wedding of their children',
+    dateLabel: 'DATE',
+    date: 'Friday, 4 December 2026',
+    time: '7:00 in the evening',
+    days: 'DAYS', hours: 'HOURS', minutes: 'MINUTES', seconds: 'SECONDS',
+    begun: 'The celebration has begun — see you there',
+    venueLabel: 'VENUE',
+    venue: 'Four Seasons Ballroom\nAmman, Jordan',
+    programmeLabel: 'PROGRAMME',
+    programme: [
+      ['7:00', 'Guests received'],
+      ['8:00', 'Wedding procession'],
+      ['9:00', 'Dinner served'],
+      ['10:30', 'Cutting of the cake'],
+    ],
+    map: 'View on map',
+    calendar: 'Add to calendar',
+    call: 'Enquiries',
+    brand: 'LAHZA',
+    muteOn: 'Mute music',
+    muteOff: 'Play music',
+    calSummary: 'Wedding of Ahmad & Sidra',
+  },
+};
+
+let T = I18N[LANG];
+
+/* ── elements ─────────────────────────────────────────────────── */
+const curtain   = document.getElementById('curtain');
+const intro     = document.getElementById('intro');
+const promptEl  = document.getElementById('prompt');
+const music     = document.getElementById('music');
+const content   = document.getElementById('content');
+const muteBtn   = document.getElementById('mute');
+const hijriEl   = document.getElementById('hijri');
+const programme = document.getElementById('programme');
+const mapsEl    = document.getElementById('maps');
+const calEl     = document.getElementById('cal');
+const cd        = document.getElementById('countdown');
+const begun     = document.getElementById('begun');
+
+/* ── rendering ────────────────────────────────────────────────── */
+const escapeHtml = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const lines = s => s.split('\n').map(escapeHtml).join('<br>');
+
+let calUrl = null;
+
+/* Repaints everything language-dependent. Deliberately touches no
+   media state, so switching language mid-invitation never restarts
+   the video or the music. */
+function paint(lang) {
+  LANG = lang;
+  T = I18N[lang];
+
+  ensureFonts(lang);
+  document.documentElement.lang = lang;
+  document.documentElement.dir  = lang === 'en' ? 'ltr' : 'rtl';
+  document.title = T.title;
+
+  document.querySelectorAll('[data-t]').forEach(el => {
+    const v = T[el.dataset.t];
+    if (typeof v === 'string') el.innerHTML = lines(v);
+  });
+
+  programme.innerHTML = T.programme
+    .map(([at, what]) => `<li><time>${escapeHtml(at)}</time><span>${escapeHtml(what)}</span></li>`)
+    .join('');
+
+  // `muted` rather than music.muted — once the Web Audio graph exists,
+  // mute lives on a gain node, not on the element.
+  muteBtn.setAttribute('aria-label', muted ? T.muteOff : T.muteOn);
+
+  // Hijri alongside Gregorian, but not on the English invitation.
+  hijriEl.textContent = '';
+  if (lang !== 'en') {
+    try {
+      hijriEl.textContent = new Intl.DateTimeFormat(
+        'ar-SA-u-ca-islamic', { day: 'numeric', month: 'long', year: 'numeric' }
+      ).format(new Date(EVENT.startsAt));
+    } catch { /* older browser: line collapses via .hijri:empty */ }
+  }
+
+  mapsEl.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(EVENT.mapQuery);
+
+  if (calUrl) URL.revokeObjectURL(calUrl);
+  calUrl = URL.createObjectURL(new Blob([buildIcs()], { type: 'text/calendar;charset=utf-8' }));
+  calEl.href = calUrl;
+
+  document.querySelectorAll('#langs a').forEach(a => {
+    if (a.dataset.lang === lang) a.setAttribute('aria-current', 'true');
+    else a.removeAttribute('aria-current');
+  });
+
+  tick();   // refresh the countdown numerals immediately
+}
+
+/* ── numerals ─────────────────────────────────────────────────── */
+const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+const digits = n => {
+  const s = String(n).padStart(2, '0');
+  return T.numerals === 'arab' ? s.replace(/\d/g, d => AR_DIGITS[d]) : s;
+};
+
+/* ── countdown ────────────────────────────────────────────────── */
+const target = new Date(EVENT.startsAt).getTime();
+const cell = u => cd.querySelector(`[data-u="${u}"]`);
+
+function tick() {
+  const diff = target - Date.now();
+  if (diff <= 0) { cd.hidden = true; begun.hidden = false; return; }
+  cd.hidden = false; begun.hidden = true;
+  cell('d').textContent = digits(Math.floor(diff / 864e5));
+  cell('h').textContent = digits(Math.floor(diff % 864e5 / 36e5));
+  cell('m').textContent = digits(Math.floor(diff % 36e5 / 6e4));
+  cell('s').textContent = digits(Math.floor(diff % 6e4 / 1e3));
+}
+
+/* ── calendar file, built in the browser so no server is needed ── */
+function buildIcs() {
+  const pad = d => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const start = new Date(EVENT.startsAt);
+  const end   = new Date(start.getTime() + EVENT.hours * 36e5);
+  const esc   = s => s.replace(/[,;]/g, m => '\\' + m).replace(/\n/g, ' ');
+
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Lahza//Invitation//' + LANG.toUpperCase(),
+    'BEGIN:VEVENT',
+    'UID:lahza-' + start.getTime() + '@lahza',
+    'DTSTAMP:' + pad(new Date()),
+    'DTSTART:' + pad(start),
+    'DTEND:'   + pad(end),
+    'SUMMARY:'  + esc(T.calSummary),
+    'LOCATION:' + esc(T.venue),
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+document.documentElement.style.setProperty('--fade', CONFIG.crossfadeMs + 'ms');
+
+/* ═══════════════════════════════════════════════════════════════
+   AUDIO
+   The muffled "next room" effect is a low-pass filter, which only
+   the Web Audio API can do — plain volume just makes things quieter.
+
+   Caveat: createMediaElementSource() reads the media as an opaque
+   origin under file://, which yields silence, and the call cannot be
+   undone. So the graph is only built when served over http(s); opened
+   as a local file we degrade to a volume-only duck. Serve the folder
+   to hear the full effect:  php -S 127.0.0.1:8000
+   ═══════════════════════════════════════════════════════════════ */
+const CAN_FILTER = location.protocol === 'http:' || location.protocol === 'https:';
+
+let actx = null, fogNode = null, duckNode = null, muteNode = null;
+let muted = false;
+
+function buildAudioGraph() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return false;
+
+    actx = new Ctx();
+    fogNode = actx.createBiquadFilter();
+    fogNode.type = 'lowpass';
+    fogNode.frequency.value = 20000;          // effectively open
+
+    duckNode = actx.createGain(); duckNode.gain.value = 0;   // fade up from silence
+    muteNode = actx.createGain(); muteNode.gain.value = 1;   // user mute lives here
+
+    actx.createMediaElementSource(music)
+        .connect(fogNode).connect(duckNode).connect(muteNode)
+        .connect(actx.destination);
+
+    return true;
+  } catch {
+    actx = fogNode = duckNode = muteNode = null;
+    return false;
+  }
+}
+
+/* Web Audio ramp. Frequency sweeps sound natural exponentially,
+   gain linearly. */
+function ramp(param, to, ms, exponential = false) {
+  const t = actx.currentTime;
+  param.cancelScheduledValues(t);
+  param.setValueAtTime(Math.max(param.value, 0.0001), t);
+  if (exponential) param.exponentialRampToValueAtTime(Math.max(to, 0.0001), t + ms / 1000);
+  else             param.linearRampToValueAtTime(to, t + ms / 1000);
+}
+
+/* Fallback for the no-graph case. */
+function rampVolume(to, ms) {
+  const from = music.volume, t0 = performance.now();
+  (function step() {
+    const p = ms > 0 ? Math.min(1, (performance.now() - t0) / ms) : 1;
+    music.volume = from + (to - from) * p;
+    if (p < 1) requestAnimationFrame(step);
+  })();
+}
+
+function startMusic() {
+  const graphed = CAN_FILTER && buildAudioGraph();
+
+  if (graphed) {
+    actx.resume();
+    music.volume = 1;                     // gain is handled by the graph now
+    ramp(duckNode.gain, 1, CONFIG.musicFadeMs);
+  } else {
+    music.volume = 0;
+    rampVolume(1, CONFIG.musicFadeMs);
+  }
+
+  music.play().then(() => muteBtn.classList.add('on')).catch(() => {});
+}
+
+/* Pull the music back and blur it once the invitation is on screen. */
+function settleMusic() {
+  if (actx) {
+    ramp(duckNode.gain, CONFIG.duckTo, CONFIG.duckMs);
+    ramp(fogNode.frequency, CONFIG.fogHz, CONFIG.duckMs, true);
+  } else {
+    rampVolume(CONFIG.duckTo, CONFIG.duckMs);   // quieter, but not muffled
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   THE SEQUENCE
+   ═══════════════════════════════════════════════════════════════ */
+let opened = false, revealed = false, fadeTimer = null;
+
+curtain.addEventListener('click', () => {
+  if (opened) return;
+  opened = true;
+
+  promptEl.classList.add('gone');
+  intro.classList.add('playing');
+
+  intro.muted = CONFIG.keepVideoAudioMs === 0;
+  intro.currentTime = 0;
+  intro.play().then(armFadeOut).catch(reveal);   // blocked or broken → don't trap the guest
+
+  if (CONFIG.keepVideoAudioMs > 0) {
+    setTimeout(() => { intro.muted = true; startMusic(); }, CONFIG.keepVideoAudioMs);
+  } else {
+    startMusic();
+  }
+
+  setTimeout(reveal, CONFIG.revealFallbackMs);
+});
+
+/* Start the dissolve before the clip runs out, so it fades while still
+   in motion. Timed with setTimeout for precision; timeupdate is the
+   backstop if playback stalls or seeks. */
+function armFadeOut() {
+  const d = intro.duration;
+  if (!isFinite(d) || d <= 0) return;          // metadata not in yet
+  const lead = CONFIG.fadeOutLeadMs / 1000;
+  clearTimeout(fadeTimer);
+  fadeTimer = setTimeout(reveal, Math.max(0, (d - lead - intro.currentTime) * 1000));
+}
+
+intro.addEventListener('loadedmetadata', () => { if (opened) armFadeOut(); });
+intro.addEventListener('timeupdate', () => {
+  const d = intro.duration;
+  if (isFinite(d) && d - intro.currentTime <= CONFIG.fadeOutLeadMs / 1000) reveal();
+});
+intro.addEventListener('ended', reveal);
+intro.addEventListener('error', reveal);
+
+function reveal() {
+  if (revealed) return;
+  revealed = true;
+  clearTimeout(fadeTimer);
+
+  curtain.classList.add('gone');
+  content.classList.add('revealed');
+  muteBtn.classList.add('on');
+  settleMusic();
+
+  // Let the clip keep running for the whole dissolve — pausing here is
+  // what made it look like it stopped and then faded.
+  setTimeout(() => { intro.pause(); curtain.remove(); }, CONFIG.crossfadeMs + 200);
+}
+
+muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  if (muteNode) muteNode.gain.value = muted ? 0 : 1;
+  else music.muted = muted;
+
+  document.getElementById('ic-on').hidden  = muted;
+  document.getElementById('ic-off').hidden = !muted;
+  muteBtn.setAttribute('aria-label', muted ? T.muteOff : T.muteOn);
+});
+
+/* ── language switcher: repaint in place, never reload ─────────── */
+document.querySelectorAll('#langs a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    // replaceState throws on some file:// origins — the URL is cosmetic here.
+    try { history.replaceState(null, '', '?lang=' + a.dataset.lang); } catch {}
+    paint(a.dataset.lang);
+  });
+});
+
+/* ── go ───────────────────────────────────────────────────────── */
+paint(LANG);
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
