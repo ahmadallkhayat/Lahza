@@ -9,22 +9,31 @@ return [
     |
     | Backs the "translate from English" button in the studio.
     |
-    | mymemory — no key needed, good for Arabic. It cannot do Sorani Kurdish:
-    |            asking for `ku` returns Kurmanji in Latin script, and `ckb`
-    |            returns unrelated text from its translation memory. It
-    |            therefore declares Arabic only, and Kurdish is refused rather
-    |            than filled with something wrong.
+    | google-free — the default. No key, and it does handle Sorani Kurdish.
+    |               It is the endpoint Google's own translate widget calls, so
+    |               there is no SLA and it can be rate-limited or blocked by IP
+    |               without notice, and it is not licensed for commercial
+    |               volume. Fine for filling drafts in your own studio; move to
+    |               `google` before this is a business.
     |
-    | google   — Cloud Translation v2. Needs a key and billing, and does
-    |            support Sorani (ckb). Set TRANSLATION_PROVIDER=google and
-    |            GOOGLE_TRANSLATE_KEY to enable Kurdish.
+    | google      — Cloud Translation v2, the supported API. Needs a key and
+    |               billing. Same coverage, dependable.
+    |
+    | mymemory    — no key, Arabic only. Kept as a fallback if the free Google
+    |               endpoint starts refusing requests. It cannot do Kurdish:
+    |               asked for `ku` it answers in Kurmanji, which is Latin
+    |               script and the wrong Kurdish; asked for `ckb` it returns
+    |               unrelated text out of its translation memory. It therefore
+    |               declares Arabic only rather than producing something wrong.
     |
     | Whatever the provider, machine output is a starting point. Every
-    | translated field is flagged for review in the form.
+    | translated field is flagged for review in the form, and a right-to-left
+    | language that comes back in Latin script is rejected rather than written
+    | into a field.
     |
     */
 
-    'provider' => env('TRANSLATION_PROVIDER', 'mymemory'),
+    'provider' => env('TRANSLATION_PROVIDER', 'google-free'),
 
     'google' => [
         'key' => env('GOOGLE_TRANSLATE_KEY'),

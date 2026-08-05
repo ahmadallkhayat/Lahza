@@ -64,17 +64,15 @@ class TranslateController extends Controller
         ]);
     }
 
+    /**
+     * Short enough to read at a glance. The full explanation of why the default
+     * provider cannot do Kurdish lives in config/translation.php, where whoever
+     * is configuring it will be looking.
+     */
     private function whyNot(string $provider, string $target): string
     {
         $label = config("templates.locales.{$target}.label", $target);
 
-        // The common case, worth being specific about: MyMemory answers Kurdish
-        // requests with Kurmanji or unrelated text, so it declines instead.
-        if ($target === 'ku') {
-            return "{$provider} cannot translate into {$label}. Set TRANSLATION_PROVIDER=google "
-                .'with a GOOGLE_TRANSLATE_KEY, which supports Sorani.';
-        }
-
-        return "{$provider} cannot translate into {$label}.";
+        return "{$label} needs a translation key — see config/translation.php.";
     }
 }

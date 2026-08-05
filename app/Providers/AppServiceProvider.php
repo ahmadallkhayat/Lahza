@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Translation\GoogleFreeProvider;
 use App\Services\Translation\GoogleProvider;
 use App\Services\Translation\MyMemoryProvider;
 use App\Services\Translation\TranslationProvider;
@@ -16,7 +17,8 @@ class AppServiceProvider extends ServiceProvider
         // do Kurdish.
         $this->app->bind(TranslationProvider::class, fn () => match (config('translation.provider')) {
             'google' => new GoogleProvider,
-            default => new MyMemoryProvider,
+            'mymemory' => new MyMemoryProvider,
+            default => new GoogleFreeProvider,
         });
     }
 

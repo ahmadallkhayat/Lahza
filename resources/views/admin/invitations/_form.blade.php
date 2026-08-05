@@ -165,7 +165,7 @@
             this.translateOk = filled.length > 0;
             this.translateNote = [
                 filled.length
-                    ? `Filled ${filled.join(' and ')} from English via ${data.provider}. Machine output — read it before publishing.`
+                    ? `${filled.join(' and ')} filled — review before publishing.`
                     : 'Nothing was translated.',
                 ...declined,
             ].join(' ');

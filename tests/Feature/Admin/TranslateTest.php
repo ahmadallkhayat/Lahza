@@ -10,6 +10,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
+/**
+ * The endpoint's contract, and MyMemory's behaviour specifically — it is the
+ * keyless fallback and the one that has to decline Kurdish. The default
+ * provider is covered by GoogleFreeTranslationTest.
+ */
 class TranslateTest extends TestCase
 {
     use RefreshDatabase;
@@ -18,6 +23,7 @@ class TranslateTest extends TestCase
     {
         parent::setUp();
 
+        config(['translation.provider' => 'mymemory']);
         $this->actingAs(User::factory()->create());
     }
 
@@ -69,7 +75,7 @@ class TranslateTest extends TestCase
         $response->assertOk()
             ->assertJsonMissingPath('translations.ku')
             ->assertJsonPath('declined.ku', fn ($reason) => str_contains($reason, 'Kurdish')
-                && str_contains($reason, 'GOOGLE_TRANSLATE_KEY'));
+                && str_contains($reason, 'translation key'));
     }
 
     public function test_the_provider_itself_refuses_kurdish(): void
