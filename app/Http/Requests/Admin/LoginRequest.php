@@ -24,8 +24,10 @@ class LoginRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Deliberately loose beyond "present": enforcing a username format here
+        // would tell an attacker what shape a real one takes.
         return [
-            'email' => ['required', 'string', 'email'],
+            'username' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
     }
@@ -37,13 +39,13 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        if (! Auth::attempt($this->only('username', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             // Deliberately vague: naming which field was wrong tells an
-            // attacker which addresses are real.
+            // attacker which usernames are real.
             throw ValidationException::withMessages([
-                'email' => 'Those credentials do not match our records.',
+                'username' => 'Those credentials do not match our records.',
             ]);
         }
 
@@ -64,7 +66,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => sprintf(
+            'username' => sprintf(
                 'Too many attempts. Try again in %d second%s.',
                 $seconds,
                 $seconds === 1 ? '' : 's'
@@ -72,9 +74,9 @@ class LoginRequest extends FormRequest
         ]);
     }
 
-    /** Throttle per email + IP, so one address cannot lock out another. */
+    /** Throttle per username + IP, so one account cannot lock out another. */
     protected function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower($this->string('username')).'|'.$this->ip());
     }
 }

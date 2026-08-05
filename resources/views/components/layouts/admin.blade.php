@@ -61,7 +61,9 @@
             </span>
             <div class="min-w-0">
                 <p class="truncate text-sm font-medium text-ink-900">{{ auth()->user()->name }}</p>
-                <p class="truncate text-xs text-ink-500">{{ auth()->user()->email }}</p>
+                {{-- The username, since that is what signs you in. Built as a
+                     string so Blade never sees a bare @ to interpret. --}}
+                <p class="truncate text-xs text-ink-500">{{ '@'.auth()->user()->username }}</p>
             </div>
         </div>
 

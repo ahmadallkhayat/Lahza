@@ -15,6 +15,7 @@ class AuthenticationTest extends TestCase
     private function studio(): User
     {
         return User::factory()->create([
+            'username' => 'admin',
             'email' => 'admin@lahza.test',
             'password' => Hash::make('password'),
         ]);
@@ -27,7 +28,7 @@ class AuthenticationTest extends TestCase
 
     public function test_login_screen_renders(): void
     {
-        $this->get('/admin/login')->assertOk()->assertSee('Sign in');
+        $this->get('/admin/login')->assertOk()->assertSee('Sign in')->assertSee('Username');
     }
 
     public function test_guests_are_redirected_from_every_studio_route(): void
@@ -42,11 +43,33 @@ class AuthenticationTest extends TestCase
         $user = $this->studio();
 
         $this->post('/admin/login', [
-            'email' => 'admin@lahza.test',
+            'username' => 'admin',
             'password' => 'password',
         ])->assertRedirect('/admin');
 
         $this->assertAuthenticatedAs($user);
+    }
+
+    /**
+     * The email is still on the record, but it is not a credential. Without
+     * this, someone could "helpfully" re-add email sign-in later and widen the
+     * way in without anyone noticing.
+     */
+    public function test_email_is_not_accepted_in_place_of_a_username(): void
+    {
+        $this->studio();
+
+        $this->post('/admin/login', [
+            'username' => 'admin@lahza.test',
+            'password' => 'password',
+        ])->assertSessionHasErrors('username');
+
+        $this->assertGuest();
+    }
+
+    public function test_email_is_still_stored_on_the_account(): void
+    {
+        $this->assertSame('admin@lahza.test', $this->studio()->fresh()->email);
     }
 
     public function test_wrong_password_is_rejected(): void
@@ -54,9 +77,9 @@ class AuthenticationTest extends TestCase
         $this->studio();
 
         $this->post('/admin/login', [
-            'email' => 'admin@lahza.test',
+            'username' => 'admin',
             'password' => 'wrong',
-        ])->assertSessionHasErrors('email');
+        ])->assertSessionHasErrors('username');
 
         $this->assertGuest();
     }
@@ -99,24 +122,24 @@ class AuthenticationTest extends TestCase
 
     public function test_login_is_rate_limited_after_five_attempts(): void
     {
-        RateLimiter::clear('admin@lahza.test|127.0.0.1');
+        RateLimiter::clear('admin|127.0.0.1');
         $this->studio();
 
         for ($i = 0; $i < 5; $i++) {
             $this->post('/admin/login', [
-                'email' => 'admin@lahza.test',
+                'username' => 'admin',
                 'password' => 'wrong',
             ]);
         }
 
         $this->post('/admin/login', [
-            'email' => 'admin@lahza.test',
+            'username' => 'admin',
             'password' => 'wrong',
-        ])->assertSessionHasErrorsIn('default', ['email']);
+        ])->assertSessionHasErrorsIn('default', ['username']);
 
         $this->assertStringContainsString(
             'Too many attempts',
-            session('errors')->first('email')
+            session('errors')->first('username')
         );
     }
 }

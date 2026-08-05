@@ -10,12 +10,14 @@
         <form method="POST" action="{{ route('admin.login.store') }}" class="space-y-4">
             @csrf
 
-            <x-ui.field label="Email" name="email" required>
+            <x-ui.field label="Username" name="username" required>
                 <x-ui.input
-                    name="email"
-                    type="email"
-                    :value="old('email')"
+                    name="username"
+                    type="text"
+                    :value="old('username')"
                     autocomplete="username"
+                    autocapitalize="none"
+                    spellcheck="false"
                     required
                     autofocus
                 />
