@@ -1,9 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\InvitationController;
+use App\Http\Controllers\Admin\InvitationController as AdminInvitationController;
 use App\Http\Controllers\Admin\LoginController;
 use App\Http\Controllers\Admin\TemplateController;
+use App\Http\Controllers\InvitationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -13,6 +14,11 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::view('/', 'public.coming-soon')->name('home');
+
+// The guest-facing invitation. Read-only, unauthenticated, and 404s while
+// the invitation is unpublished.
+Route::get('/i/{invitation}', [InvitationController::class, 'show'])->name('invitations.show');
+Route::get('/i/{invitation}/calendar.ics', [InvitationController::class, 'calendar'])->name('invitations.calendar');
 
 /*
 |--------------------------------------------------------------------------
@@ -36,7 +42,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         Route::get('/', DashboardController::class)->name('dashboard');
 
-        Route::get('templates', [TemplateController::class, 'index'])->name('templates.index');
-        Route::get('invitations', [InvitationController::class, 'index'])->name('invitations.index');
+        Route::resource('templates', TemplateController::class)->except('show');
+
+        Route::resource('invitations', AdminInvitationController::class)->except('show');
+        Route::patch('invitations/{invitation}/publish', [AdminInvitationController::class, 'togglePublish'])
+            ->name('invitations.publish');
     });
 });
