@@ -71,6 +71,14 @@
                         <x-ui.td class="text-end">
                             <div class="flex items-center justify-end gap-1">
                                 <x-ui.button
+                                    :href="route('admin.invitations.edit', $invitation)"
+                                    variant="ghost"
+                                    size="sm"
+                                >
+                                    Edit
+                                </x-ui.button>
+
+                                <x-ui.button
                                     :href="route('invitations.show', $invitation)"
                                     variant="ghost"
                                     size="sm"

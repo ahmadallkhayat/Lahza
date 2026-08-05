@@ -62,17 +62,22 @@
 
         has(code) { return this.locales.includes(code) },
 
-        toggle(code) {
-            if (this.has(code)) {
+        init() {
+            // The checkboxes use x-model, so Alpine keeps `locales` in step
+            // with them natively. These two rules are enforced afterwards
+            // rather than by intercepting the click — intercepting meant
+            // fighting the browser over the checkbox's own state.
+            this.$watch('locales', () => {
                 // Never leave an invitation with no language at all.
-                if (this.locales.length === 1) return;
-                this.locales = this.locales.filter(c => c !== code);
-            } else {
-                this.locales.push(code);
-            }
+                if (this.locales.length === 0) {
+                    this.locales = [this.def || 'ar'];
 
-            // The default has to stay one of the chosen languages.
-            if (! this.has(this.def)) this.def = this.locales[0];
+                    return;
+                }
+
+                // The default has to stay one of the chosen languages.
+                if (! this.has(this.def)) this.def = this.locales[0];
+            });
         },
 
         addStep() {
@@ -199,12 +204,15 @@
                             ? 'border-brand-300 bg-brand-50 text-brand-800'
                             : 'border-ink-300 bg-white text-ink-600 hover:bg-ink-50'"
                     >
+                        {{-- x-model on a shared array is how Alpine does
+                             checkbox groups: it adds and removes the value,
+                             keeps the element's checked property right, and the
+                             value still submits normally. --}}
                         <input
                             type="checkbox"
                             name="locales[]"
                             value="{{ $code }}"
-                            :checked="has('{{ $code }}')"
-                            x-on:click.prevent="toggle('{{ $code }}')"
+                            x-model="locales"
                             class="rounded border-ink-300 text-brand-600 focus:ring-brand-500"
                         >
                         {{ $meta['label'] }}{{ $meta['rtl'] ? ' (RTL)' : '' }}
@@ -222,9 +230,13 @@
                 required
                 hint="What /i/{slug} shows. The others get /i/{slug}/{code}."
             >
-                <x-ui.select name="default_locale" x-model="def" required>
+                {{-- Not x-model: on a select whose options come from x-for,
+                     x-model initialises before the options exist and the
+                     selection does not stick. Binding :selected and reading
+                     the change event avoids that ordering entirely. --}}
+                <x-ui.select name="default_locale" x-on:change="def = $event.target.value" required>
                     <template x-for="code in locales" :key="code">
-                        <option :value="code" x-text="labels[code]"></option>
+                        <option :value="code" :selected="code === def" x-text="labels[code]"></option>
                     </template>
                 </x-ui.select>
             </x-ui.field>
