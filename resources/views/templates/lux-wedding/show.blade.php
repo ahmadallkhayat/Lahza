@@ -12,15 +12,28 @@
     $rtl = $invitation->isRtl();
     $locale = $invitation->locale;
 
-    // Names are Arabic in every locale, so Aref Ruqaa and Amiri always load.
-    // Kurdish must not use Cairo — Cairo has no glyphs for ڕ ڵ ۆ ە ێ, and a
-    // fallback face supplying only those letters breaks the cursive joins.
-    $families = ['amiri:400,700', 'aref-ruqaa:400,700'];
-    $families[] = match ($locale) {
-        'en' => 'cormorant-garamond:300,400,400i',
-        'ku' => 'noto-sans-arabic:300,400,600',
-        default => 'cairo:300,400,600',
+    // Names and the verse are Arabic in every locale, so Aref Ruqaa and Amiri
+    // always load. Kurdish must not use Cairo — Cairo has no glyphs for
+    // ڕ ڵ ۆ ە ێ, and a fallback face supplying only those five letters breaks
+    // the cursive joins.
+    $fonts = ['amiri', 'aref-ruqaa'];
+    $fonts[] = match ($locale) {
+        'en' => 'cormorant-garamond',
+        'ku' => 'noto-sans-arabic',
+        default => 'cairo',
     };
+
+    // Self-hosted by `php artisan fonts:fetch`. Falls back to the CDN so a
+    // checkout that has not run it still renders correctly.
+    $selfHosted = collect($fonts)->every(fn ($f) => file_exists(public_path("fonts/{$f}.css")));
+
+    $cdnSpec = [
+        'amiri' => 'amiri:400,700',
+        'aref-ruqaa' => 'aref-ruqaa:400,700',
+        'cairo' => 'cairo:300,400,600',
+        'noto-sans-arabic' => 'noto-sans-arabic:300,400,600',
+        'cormorant-garamond' => 'cormorant-garamond:300,400,400i',
+    ];
 
     $latinFont = "'Cormorant Garamond', Georgia, serif";
     $uiFont = match ($locale) {
@@ -46,8 +59,14 @@
 <meta property="og:url" content="{{ route('invitations.show', $invitation) }}">
 <meta name="twitter:card" content="summary_large_image">
 
-<link rel="preconnect" href="https://fonts.bunny.net">
-<link href="https://fonts.bunny.net/css?family={{ implode('&family=', $families) }}&display=swap" rel="stylesheet">
+@if ($selfHosted)
+    @foreach ($fonts as $font)
+        <link rel="stylesheet" href="{{ asset("fonts/{$font}.css") }}">
+    @endforeach
+@else
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link rel="stylesheet" href="https://fonts.bunny.net/css?family={{ collect($fonts)->map(fn ($f) => $cdnSpec[$f])->implode('&family=') }}&display=swap">
+@endif
 
 <style>
 :root {

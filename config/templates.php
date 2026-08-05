@@ -76,4 +76,19 @@ return [
     'max_video_kb' => 100000,
     'max_music_kb' => 51200,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Palette extraction
+    |--------------------------------------------------------------------------
+    |
+    | Colours can be derived from a template's intro video. Frames are sampled
+    | with ffmpeg and read with GD. If the binaries are not on the machine the
+    | extraction is skipped and the colours entered in the form are kept.
+    |
+    */
+
+    'ffmpeg' => env('FFMPEG_PATH', 'ffmpeg'),
+    'ffprobe' => env('FFPROBE_PATH', 'ffprobe'),
+    'palette_frames' => 6,
+
 ];

@@ -116,6 +116,22 @@
 </x-ui.card>
 
 <x-ui.card title="Colours" description="Emitted as CSS custom properties the design reads.">
+    <label class="mb-5 flex items-start gap-2.5 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-ink-700">
+        <input
+            type="checkbox"
+            name="derive_palette"
+            value="1"
+            class="mt-0.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+        >
+        <span>
+            Read colours from the intro video
+            <span class="mt-0.5 block text-xs text-ink-500">
+                Samples frames from the clip and derives all seven roles, keeping each one legible.
+                Overwrites the values below. Leave unchecked to keep them as they are.
+            </span>
+        </span>
+    </label>
+
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach ($paletteLabels as $key => $label)
             <x-ui.field :label="$label" :name="'palette.'.$key" :for="'palette_'.$key">

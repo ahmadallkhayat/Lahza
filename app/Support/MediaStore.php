@@ -41,6 +41,24 @@ final class MediaStore
     }
 
     /**
+     * Absolute filesystem path for a stored public URL, or null when the file
+     * is not there. Needed by anything that has to read the bytes — ffmpeg
+     * cannot open a URL on the public disk.
+     */
+    public static function absolutePath(?string $url): ?string
+    {
+        if (blank($url)) {
+            return null;
+        }
+
+        $path = self::pathFromUrl($url);
+
+        return $path !== '' && Storage::disk('public')->exists($path)
+            ? Storage::disk('public')->path($path)
+            : null;
+    }
+
+    /**
      * Strip the /storage/ prefix a public-disk URL carries, leaving the
      * relative path the disk itself understands.
      */

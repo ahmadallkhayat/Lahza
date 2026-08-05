@@ -40,6 +40,7 @@ class TemplateRequest extends FormRequest
                 'max:'.config('templates.max_music_kb'),
             ],
             'remove_music' => ['nullable', 'boolean'],
+            'derive_palette' => ['nullable', 'boolean'],
 
             // Colours and timings arrive as sub-arrays keyed by role.
             'palette' => ['array'],
@@ -87,7 +88,7 @@ class TemplateRequest extends FormRequest
 
         $data['is_active'] = $this->boolean('is_active');
 
-        unset($data['remove_music']);
+        unset($data['remove_music'], $data['derive_palette']);
 
         return $data;
     }
