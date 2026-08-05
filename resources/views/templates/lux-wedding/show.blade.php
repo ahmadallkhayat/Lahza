@@ -59,6 +59,8 @@
 <meta property="og:url" content="{{ route('invitations.show', $invitation) }}">
 <meta name="twitter:card" content="summary_large_image">
 
+<link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+
 @if ($selfHosted)
     @foreach ($fonts as $font)
         <link rel="stylesheet" href="{{ asset("fonts/{$font}.css") }}">
