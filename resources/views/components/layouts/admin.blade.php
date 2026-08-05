@@ -26,7 +26,9 @@
     :class="drawer ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
 >
     <div class="flex h-14 shrink-0 items-center justify-between border-b border-ink-200 px-4">
-        <x-ui.brand :href="route('admin.dashboard')" />
+        {{-- Wordmark shown here: at sidebar size the mark's own letterforms
+             are too small to carry the name. --}}
+        <x-ui.brand :href="route('admin.dashboard')" wordmark />
         <button type="button" @click="drawer = false" class="rounded-md p-1 text-ink-400 hover:bg-ink-100 lg:hidden">
             <x-heroicon-o-x-mark class="h-5 w-5" />
             <span class="sr-only">Close navigation</span>
@@ -86,7 +88,7 @@
             <x-heroicon-o-bars-3 class="h-5 w-5" />
             <span class="sr-only">Open navigation</span>
         </button>
-        <x-ui.brand />
+        <x-ui.brand wordmark />
     </div>
 
     <main class="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
