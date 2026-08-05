@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\TemplateRequest;
 use App\Models\Template;
 use App\Services\VideoPaletteExtractor;
+use App\Support\BaseTemplates;
 use App\Support\MediaStore;
-use App\Support\TemplateViews;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -27,7 +27,7 @@ class TemplateController extends Controller
     {
         return view('admin.templates.create', [
             'template' => new Template,
-            'views' => TemplateViews::available(),
+            'baseTemplates' => BaseTemplates::available(),
         ]);
     }
 
@@ -51,7 +51,7 @@ class TemplateController extends Controller
     {
         return view('admin.templates.edit', [
             'template' => $template,
-            'views' => TemplateViews::available(),
+            'baseTemplates' => BaseTemplates::available(),
         ]);
     }
 

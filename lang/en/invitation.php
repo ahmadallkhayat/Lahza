@@ -29,6 +29,7 @@ return [
     'calendar' => 'Add to calendar',
     'call' => 'Enquiries',
 
+    'language' => 'Language',
     'mute' => 'Mute music',
     'unmute' => 'Play music',
 

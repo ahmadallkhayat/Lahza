@@ -15,10 +15,21 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'public.coming-soon')->name('home');
 
-// The guest-facing invitation. Read-only, unauthenticated, and 404s while
-// the invitation is unpublished.
+// The guest-facing invitation. Read-only, unauthenticated, and 404s while the
+// invitation is unpublished.
+//
+// /i/{slug}          the invitation's default language
+// /i/{slug}/{locale} a specific language, so one link per language can be sent
+//
+// The locale segment is constrained so it cannot swallow "calendar.ics".
 Route::get('/i/{invitation}', [InvitationController::class, 'show'])->name('invitations.show');
 Route::get('/i/{invitation}/calendar.ics', [InvitationController::class, 'calendar'])->name('invitations.calendar');
+Route::get('/i/{invitation}/{locale}', [InvitationController::class, 'show'])
+    ->whereIn('locale', ['ar', 'ku', 'en'])
+    ->name('invitations.show.locale');
+Route::get('/i/{invitation}/{locale}/calendar.ics', [InvitationController::class, 'calendar'])
+    ->whereIn('locale', ['ar', 'ku', 'en'])
+    ->name('invitations.calendar.locale');
 
 /*
 |--------------------------------------------------------------------------

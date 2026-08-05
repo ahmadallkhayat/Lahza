@@ -24,30 +24,22 @@
     ];
 @endphp
 
-<x-ui.card title="Design" description="What this template is and which code renders it.">
+<x-ui.card title="Theme" description="A custom theme built on one of the base templates.">
     <div class="grid gap-5 sm:grid-cols-2">
         <x-ui.field label="Name" name="name" required>
             <x-ui.input name="name" :value="old('name', $template->name)" required />
         </x-ui.field>
 
-        <x-ui.field label="Category" name="category" required>
-            <x-ui.select name="category" required>
-                @foreach (config('templates.categories') as $key => $label)
-                    <option value="{{ $key }}" @selected(old('category', $template->category) === $key)>{{ $label }}</option>
-                @endforeach
-            </x-ui.select>
-        </x-ui.field>
-
         <x-ui.field
-            label="Design view"
-            name="view"
+            label="Base template"
+            name="base_template"
             required
-            hint="Blade directory under resources/views/templates."
+            hint="The design this theme is built on. Each is a directory under resources/views/base-templates."
         >
-            <x-ui.select name="view" required>
-                <option value="">Select a design</option>
-                @foreach ($views as $key => $label)
-                    <option value="{{ $key }}" @selected(old('view', $template->view) === $key)>{{ $label }} ({{ $key }})</option>
+            <x-ui.select name="base_template" required>
+                <option value="">Select a base template</option>
+                @foreach ($baseTemplates as $key => $label)
+                    <option value="{{ $key }}" @selected(old('base_template', $template->base_template) === $key)>{{ $label }}</option>
                 @endforeach
             </x-ui.select>
         </x-ui.field>

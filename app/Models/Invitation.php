@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Arr;
 use IntlCalendar;
 use IntlDateFormatter;
 
@@ -15,10 +16,17 @@ class Invitation extends Model
 {
     use HasFactory;
 
+    /**
+     * Content that differs per language. Stored as JSON keyed by locale, since
+     * an invitation issued in three languages needs three venue names, not one.
+     */
+    public const TRANSLATABLE = ['hosts', 'venue_name', 'venue_city'];
+
     protected $fillable = [
         'template_id',
         'slug',
-        'locale',
+        'locales',
+        'default_locale',
         'groom_ar',
         'bride_ar',
         'groom_latin',
@@ -30,6 +38,7 @@ class Invitation extends Model
         'venue_name',
         'venue_city',
         'map_query',
+        'map_url',
         'phone',
         'programme',
         'show_verse',
@@ -37,23 +46,27 @@ class Invitation extends Model
     ];
 
     protected $casts = [
+        'locales' => 'array',
+        'hosts' => 'array',
+        'venue_name' => 'array',
+        'venue_city' => 'array',
         'programme' => 'array',
         'show_verse' => 'boolean',
         'published' => 'boolean',
         'duration_hours' => 'integer',
     ];
 
+    /** Locale the page is currently being rendered in. */
+    protected ?string $renderLocale = null;
+
     /**
      * `starts_at` is always UTC in the database.
      *
      * A plain datetime cast is not enough: Eloquent writes whatever wall clock
-     * the Carbon instance happens to carry, so handing it a zoned instance
-     * stored the local time and read it back as UTC — an event set for 19:00
-     * in Amman came out as 22:00. Converting on the way in makes that
-     * impossible regardless of what the caller passes.
-     *
-     * Callers should pass a timezone-aware instance, or a string that is
-     * already UTC.
+     * the Carbon instance carries, so handing it a zoned instance stored the
+     * local time and read it back as UTC — an event set for 19:00 in Baghdad
+     * came out as 22:00. Converting on the way in makes that impossible
+     * regardless of what the caller passes.
      */
     protected function startsAt(): Attribute
     {
@@ -73,9 +86,134 @@ class Invitation extends Model
         return $this->belongsTo(Template::class);
     }
 
-    /* ── time ─────────────────────────────────────────────────────── */
+    /* ── locales ──────────────────────────────────────────────────── */
 
-    /** Event start in its own timezone rather than the app's. */
+    /** @return array<int, string> */
+    public function localeList(): array
+    {
+        $locales = array_values(array_filter((array) $this->locales));
+
+        return $locales !== [] ? $locales : [$this->default_locale ?: 'ar'];
+    }
+
+    public function hasLocale(?string $locale): bool
+    {
+        return $locale !== null && in_array($locale, $this->localeList(), true);
+    }
+
+    public function isMultilingual(): bool
+    {
+        return count($this->localeList()) > 1;
+    }
+
+    /** Fixes the locale this instance renders in for the rest of the request. */
+    public function renderIn(string $locale): static
+    {
+        $this->renderLocale = $this->hasLocale($locale) ? $locale : $this->defaultLocale();
+        $this->renderLocale ??= 'ar';
+
+        return $this;
+    }
+
+    public function locale(): string
+    {
+        return $this->renderLocale ?? $this->defaultLocale();
+    }
+
+    public function defaultLocale(): string
+    {
+        return $this->hasLocale($this->default_locale)
+            ? $this->default_locale
+            : Arr::first($this->localeList()) ?? 'ar';
+    }
+
+    /* ── translated content ───────────────────────────────────────── */
+
+    /**
+     * A translated field in the current (or given) language.
+     *
+     * Falls back to the default locale and then to any value present, so a
+     * language left half-filled still renders something rather than a gap.
+     */
+    public function text(string $field, ?string $locale = null): ?string
+    {
+        $values = (array) ($this->{$field} ?? []);
+
+        if ($values === []) {
+            return null;
+        }
+
+        $locale ??= $this->locale();
+
+        $value = $values[$locale]
+            ?? $values[$this->defaultLocale()]
+            ?? Arr::first(array_filter($values, fn ($v) => filled($v)));
+
+        return filled($value) ? $value : null;
+    }
+
+    /**
+     * Programme rows for the current language, blank ones dropped.
+     *
+     * @return array<int, array{time: string, title: string}>
+     */
+    public function programmeRows(?string $locale = null): array
+    {
+        $all = (array) ($this->programme ?? []);
+        $locale ??= $this->locale();
+
+        $rows = $all[$locale] ?? $all[$this->defaultLocale()] ?? Arr::first($all) ?? [];
+
+        return array_values(array_filter(
+            (array) $rows,
+            fn ($row) => is_array($row) && filled($row['title'] ?? null)
+        ));
+    }
+
+    /* ── presentation ─────────────────────────────────────────────── */
+
+    public function isRtl(): bool
+    {
+        return (bool) config("templates.locales.{$this->locale()}.rtl", false);
+    }
+
+    /** Sorani Kurdish is `ckb` to ICU, not `ku`. */
+    private function icuBase(): string
+    {
+        return $this->locale() === 'ku' ? 'ckb' : $this->locale();
+    }
+
+    private function format(string $pattern, bool $hijri = false): string
+    {
+        // A `calendar` locale keyword is silently ignored by IntlDateFormatter
+        // — it keeps returning Gregorian. Only an explicit IntlCalendar passed
+        // as the constructor's calendar argument actually switches it.
+        $calendar = $hijri
+            ? IntlCalendar::createInstance($this->timezone, 'ar@calendar=islamic-umalqura')
+            : IntlDateFormatter::GREGORIAN;
+
+        // ICU has no Kurdish names for the Hijri months and falls back to
+        // English ("Jumada II"), which reads worse on an Arabic-script page
+        // than the Arabic does.
+        $formatLocale = $hijri ? 'ar' : $this->icuBase();
+
+        $formatter = new IntlDateFormatter(
+            // Latin digits, so Numerals owns the conversion in one place.
+            $formatLocale.'@numbers=latn',
+            IntlDateFormatter::FULL,
+            IntlDateFormatter::NONE,
+            $this->timezone,
+            $calendar
+        );
+
+        $formatter->setPattern($pattern);
+
+        return Numerals::localise(
+            (string) $formatter->format($this->startsAtLocal()),
+            $this->locale()
+        );
+    }
+
     public function startsAtLocal(): CarbonImmutable
     {
         return $this->starts_at->setTimezone($this->timezone);
@@ -92,51 +230,6 @@ class Invitation extends Model
         return $this->startsAtLocal()->toIso8601String();
     }
 
-    /* ── presentation ─────────────────────────────────────────────── */
-
-    public function isRtl(): bool
-    {
-        return (bool) config("templates.locales.{$this->locale}.rtl", false);
-    }
-
-    /** Sorani Kurdish is `ckb` to ICU, not `ku`. */
-    private function icuBase(): string
-    {
-        return $this->locale === 'ku' ? 'ckb' : $this->locale;
-    }
-
-    private function format(string $pattern, bool $hijri = false): string
-    {
-        // A `calendar` locale keyword is silently ignored by IntlDateFormatter
-        // — it keeps returning Gregorian. Only an explicit IntlCalendar passed
-        // as the constructor's calendar argument actually switches it.
-        $calendar = $hijri
-            ? IntlCalendar::createInstance($this->timezone, 'ar@calendar=islamic-umalqura')
-            : IntlDateFormatter::GREGORIAN;
-
-        // ICU has no Kurdish names for the Hijri months and falls back to
-        // English ("Jumada II"), which reads worse on an Arabic-script page
-        // than the Arabic names do. Hijri is therefore always formatted in
-        // Arabic; the Gregorian line stays in the invitation's own language.
-        $formatLocale = $hijri ? 'ar' : $this->icuBase();
-
-        $formatter = new IntlDateFormatter(
-            // Latin digits, so Numerals owns the conversion in one place.
-            $formatLocale.'@numbers=latn',
-            IntlDateFormatter::FULL,
-            IntlDateFormatter::NONE,
-            $this->timezone,
-            $calendar
-        );
-
-        $formatter->setPattern($pattern);
-
-        return Numerals::localise(
-            (string) $formatter->format($this->startsAtLocal()),
-            $this->locale
-        );
-    }
-
     /** e.g. "الجمعة، ٤ ديسمبر ٢٠٢٦" / "Friday, 4 December 2026" */
     public function formattedDate(): string
     {
@@ -145,8 +238,7 @@ class Invitation extends Model
     }
 
     /**
-     * Hijri alongside Gregorian, Arabic and Kurdish only — an English
-     * invitation has no use for it.
+     * Hijri alongside Gregorian, Arabic and Kurdish only.
      *
      * Umm al-Qura rather than the tabular `islamic` calendar: it is the civil
      * one actually in use, and the two differ by a day.
@@ -158,43 +250,34 @@ class Invitation extends Model
             : null;
     }
 
-    /**
-     * Time with a translated meridiem. ICU's own marker is a terse "م", so the
-     * fuller wording comes from the lang files instead.
-     */
+    /** Time with a translated meridiem; ICU's own marker is a terse "م". */
     public function formattedTime(): string
     {
-        $clock = Numerals::localise($this->startsAtLocal()->format('g:i'), $this->locale);
+        $clock = Numerals::localise($this->startsAtLocal()->format('g:i'), $this->locale());
         $meridiem = __($this->startsAtLocal()->hour < 12 ? 'invitation.am' : 'invitation.pm');
 
         return $clock.' '.$meridiem;
     }
 
-    /* ── content ──────────────────────────────────────────────────── */
-
-    /**
-     * Programme rows with something to show, in the order the studio set.
-     *
-     * @return array<int, array{time: string, title: string}>
-     */
-    public function programmeRows(): array
-    {
-        return array_values(array_filter(
-            $this->programme ?? [],
-            fn ($row) => filled($row['title'] ?? null)
-        ));
-    }
-
     /** Latin names only appear beneath the Arabic on English invitations. */
     public function showsLatinNames(): bool
     {
-        return $this->locale === 'en'
+        return $this->locale() === 'en'
             && (filled($this->groom_latin) || filled($this->bride_latin));
     }
 
+    /**
+     * A pasted Google Maps link wins over a search query — it points at the
+     * exact place rather than whatever the name happens to match.
+     */
     public function mapUrl(): ?string
     {
-        $query = $this->map_query ?: trim($this->venue_name.' '.$this->venue_city);
+        if (filled($this->map_url)) {
+            return $this->map_url;
+        }
+
+        $query = $this->map_query
+            ?: trim($this->text('venue_name').' '.$this->text('venue_city'));
 
         return filled($query)
             ? 'https://www.google.com/maps/search/?api=1&query='.urlencode($query)

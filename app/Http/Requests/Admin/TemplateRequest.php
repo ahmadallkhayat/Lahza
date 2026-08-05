@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\Template;
-use App\Support\TemplateViews;
+use App\Support\BaseTemplates;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,8 +24,7 @@ class TemplateRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', 'alpha_dash', Rule::unique('templates', 'slug')->ignore($id)],
-            'category' => ['required', Rule::in(array_keys(config('templates.categories')))],
-            'view' => ['required', Rule::in(array_keys(TemplateViews::available()))],
+            'base_template' => ['required', Rule::in(array_keys(BaseTemplates::available()))],
             'description' => ['nullable', 'string', 'max:2000'],
             'is_active' => ['nullable', 'boolean'],
 
@@ -62,13 +61,13 @@ class TemplateRequest extends FormRequest
     {
         return [
             'palette.*.regex' => 'Colours must be six-digit hex values, like #a8874f.',
-            'view.in' => 'That design has no Blade view under resources/views/templates.',
+            'base_template.in' => 'That base template has no directory under resources/'.BaseTemplates::ROOT.'.',
         ];
     }
 
     /**
-     * Only keep colour and timing keys the model actually understands, so a
-     * hand-crafted request cannot stuff arbitrary data into the JSON columns.
+     * Only keep colour and timing keys the model understands, so a hand-crafted
+     * request cannot stuff arbitrary data into the JSON columns.
      *
      * @return array<string, mixed>
      */

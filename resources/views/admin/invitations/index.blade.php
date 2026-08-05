@@ -1,5 +1,5 @@
 <x-layouts.admin title="Invitations">
-    <x-ui.page-header title="Invitations" description="One per customer, built from a template.">
+    <x-ui.page-header title="Invitations" description="One per customer, with a link per language.">
         <x-slot:actions>
             <x-ui.button :href="route('admin.invitations.create')" icon="plus">New invitation</x-ui.button>
         </x-slot:actions>
@@ -10,7 +10,7 @@
             <x-ui.empty
                 icon="envelope-open"
                 title="No invitations yet"
-                description="Each invitation pairs a customer's details with one of your templates."
+                description="Each invitation pairs a customer's details with one of your themes."
             >
                 <x-slot:actions>
                     <x-ui.button :href="route('admin.invitations.create')" icon="plus">New invitation</x-ui.button>
@@ -22,7 +22,7 @@
                     <x-ui.th>Couple</x-ui.th>
                     <x-ui.th>Template</x-ui.th>
                     <x-ui.th>Date</x-ui.th>
-                    <x-ui.th>Language</x-ui.th>
+                    <x-ui.th>Links</x-ui.th>
                     <x-ui.th>Status</x-ui.th>
                     <x-ui.th class="text-end">Actions</x-ui.th>
                 </x-slot:head>
@@ -42,7 +42,23 @@
                             {{ $invitation->startsAtLocal()->format('d M Y, H:i') }}
                         </x-ui.td>
 
-                        <x-ui.td>{{ config("templates.locales.{$invitation->locale}.label") }}</x-ui.td>
+                        <x-ui.td>
+                            <div class="flex flex-wrap items-center gap-1">
+                                @foreach ($invitation->localeList() as $code)
+                                    <a
+                                        href="{{ $code === $invitation->defaultLocale()
+                                            ? route('invitations.show', $invitation)
+                                            : route('invitations.show.locale', [$invitation, $code]) }}"
+                                        target="_blank"
+                                        title="{{ config("templates.locales.{$code}.label") }}"
+                                    >
+                                        <x-ui.badge :tone="$code === $invitation->defaultLocale() ? 'brand' : 'neutral'">
+                                            {{ strtoupper($code) }}
+                                        </x-ui.badge>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </x-ui.td>
 
                         <x-ui.td>
                             @if ($invitation->published)

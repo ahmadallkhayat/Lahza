@@ -4,39 +4,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Categories
-    |--------------------------------------------------------------------------
-    |
-    | Occasions a template can belong to. Keys are stored on the record; values
-    | are what the studio sees. Adding one is a single line here.
-    |
-    */
-
-    'categories' => [
-        'lux-wedding' => 'Lux Wedding',
-        'wedding' => 'Wedding',
-        'engagement' => 'Engagement',
-        'graduation' => 'Graduation',
-        'birthday' => 'Birthday',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Locales
     |--------------------------------------------------------------------------
     |
-    | Languages an invitation can be authored in. `rtl` drives the page
-    | direction; `numerals` picks Arabic-Indic (٠١٢) or Latin (012) digits.
+    | Languages an invitation can be issued in. One invitation may use several,
+    | each getting its own guest link.
+    |
+    | `rtl` drives the page direction. `numerals` picks Arabic-Indic (٠١٢) or
+    | Latin (012) digits. `label` is what the studio sees; `short` is what a
+    | guest sees on the language switcher, in that language's own script.
     |
     | ku is Sorani Kurdish — Arabic script, right to left. Kurmanji is Latin
     | and left to right, and would be a separate entry.
     |
+    | Adding a locale here also needs a lang/<code>/invitation.php file and the
+    | code adding to the route constraint in routes/web.php.
+    |
     */
 
     'locales' => [
-        'ar' => ['label' => 'Arabic', 'rtl' => true, 'numerals' => 'arab'],
-        'ku' => ['label' => 'Kurdish (Sorani)', 'rtl' => true, 'numerals' => 'arab'],
-        'en' => ['label' => 'English', 'rtl' => false, 'numerals' => 'latn'],
+        'ar' => ['label' => 'Arabic', 'short' => 'ع', 'rtl' => true, 'numerals' => 'arab'],
+        'ku' => ['label' => 'Kurdish (Sorani)', 'short' => 'کو', 'rtl' => true, 'numerals' => 'arab'],
+        'en' => ['label' => 'English', 'short' => 'EN', 'rtl' => false, 'numerals' => 'latn'],
     ],
 
     /*
@@ -44,13 +33,16 @@ return [
     | Timezones
     |--------------------------------------------------------------------------
     |
-    | Shortlist offered in the studio. Any zone PHP recognises still validates.
+    | Shortlist offered in the studio, Baghdad first as the default. Any zone
+    | PHP recognises still validates.
     |
     */
 
+    'default_timezone' => 'Asia/Baghdad',
+
     'timezones' => [
-        'Asia/Amman',
         'Asia/Baghdad',
+        'Asia/Amman',
         'Asia/Riyadh',
         'Asia/Dubai',
         'Asia/Kuwait',

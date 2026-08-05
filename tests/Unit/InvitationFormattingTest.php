@@ -11,19 +11,19 @@ class InvitationFormattingTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function at(string $local, string $tz = 'Asia/Amman', string $locale = 'ar'): Invitation
+    private function at(string $local, string $tz = 'Asia/Baghdad', string $locale = 'ar'): Invitation
     {
         return Invitation::factory()->create([
             'starts_at' => CarbonImmutable::parse($local, $tz),
             'timezone' => $tz,
-            'locale' => $locale,
+            'locales' => [$locale], 'default_locale' => $locale,
         ]);
     }
 
     /**
      * Eloquent stores whatever wall clock a Carbon instance carries, so a
      * zoned instance used to be written as local time and read back as UTC —
-     * 19:00 in Amman came out as 22:00. The model converts on the way in.
+     * 19:00 in Baghdad came out as 22:00. The model converts on the way in.
      */
     public function test_start_time_is_stored_utc_and_read_back_in_the_event_zone(): void
     {
@@ -117,11 +117,11 @@ class InvitationFormattingTest extends TestCase
     public function test_blank_programme_rows_are_dropped(): void
     {
         $invitation = Invitation::factory()->create([
-            'programme' => [
+            'programme' => ['ar' => [
                 ['time' => '19:00', 'title' => 'Reception'],
                 ['time' => '20:00', 'title' => ''],
                 ['time' => '', 'title' => null],
-            ],
+            ]],
         ]);
 
         $this->assertCount(1, $invitation->programmeRows());
@@ -132,8 +132,9 @@ class InvitationFormattingTest extends TestCase
     {
         $invitation = Invitation::factory()->create([
             'map_query' => null,
-            'venue_name' => 'Babylon Hall',
-            'venue_city' => 'Baghdad',
+            'map_url' => null,
+            'venue_name' => ['ar' => 'Babylon Hall'],
+            'venue_city' => ['ar' => 'Baghdad'],
         ]);
 
         $this->assertStringContainsString('Babylon+Hall+Baghdad', $invitation->mapUrl());
@@ -143,6 +144,7 @@ class InvitationFormattingTest extends TestCase
     {
         $invitation = Invitation::factory()->create([
             'map_query' => null,
+            'map_url' => null,
             'venue_name' => null,
             'venue_city' => null,
         ]);

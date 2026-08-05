@@ -1,5 +1,5 @@
 <x-layouts.admin title="Templates">
-    <x-ui.page-header title="Templates" description="Invitation designs, grouped by occasion.">
+    <x-ui.page-header title="Templates" description="Custom themes, each built on a base template.">
         <x-slot:actions>
             <x-ui.button :href="route('admin.templates.create')" icon="plus">New template</x-ui.button>
         </x-slot:actions>
@@ -10,7 +10,7 @@
             <x-ui.empty
                 icon="swatch"
                 title="No templates yet"
-                description="A template pairs a design in code with its media, colours and reveal timings."
+                description="A theme pairs a base template with its own media, colours and reveal timings."
             >
                 <x-slot:actions>
                     <x-ui.button :href="route('admin.templates.create')" icon="plus">New template</x-ui.button>
@@ -20,7 +20,7 @@
             <x-ui.table>
                 <x-slot:head>
                     <x-ui.th>Name</x-ui.th>
-                    <x-ui.th>Category</x-ui.th>
+                    <x-ui.th>Base template</x-ui.th>
                     <x-ui.th>Media</x-ui.th>
                     <x-ui.th>Invitations</x-ui.th>
                     <x-ui.th>Status</x-ui.th>
@@ -36,7 +36,7 @@
                             <p class="text-xs text-ink-500">{{ $template->slug }}</p>
                         </x-ui.td>
 
-                        <x-ui.td>{{ $template->categoryLabel() }}</x-ui.td>
+                        <x-ui.td>{{ $template->baseTemplateLabel() }}</x-ui.td>
 
                         <x-ui.td>
                             <div class="flex items-center gap-1.5">

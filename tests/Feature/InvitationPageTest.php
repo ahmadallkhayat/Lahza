@@ -119,7 +119,7 @@ class InvitationPageTest extends TestCase
 
     public function test_missing_template_view_fails_loudly(): void
     {
-        $template = Template::factory()->create(['view' => 'no-such-design']);
+        $template = Template::factory()->create(['base_template' => 'no-such-design']);
         $invitation = Invitation::factory()->for($template)->create();
 
         $this->assertFalse($template->isRenderable());

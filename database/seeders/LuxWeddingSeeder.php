@@ -25,8 +25,7 @@ class LuxWeddingSeeder extends Seeder
             ['slug' => 'lux-wedding'],
             [
                 'name' => 'Lux Wedding',
-                'category' => 'lux-wedding',
-                'view' => 'lux-wedding',
+                'base_template' => 'lux-wedding',
                 'description' => 'Ring box opening onto champagne light. Ivory and gold, Arabic-first.',
                 'palette' => [
                     'paper' => '#f7f1e8',
@@ -90,27 +89,61 @@ class LuxWeddingSeeder extends Seeder
             ['slug' => 'ahmad-sidra'],
             [
                 'template_id' => $template->id,
-                'locale' => 'ar',
+
+                // Issued in all three, so every language link is there to look
+                // at straight after seeding.
+                'locales' => ['ar', 'ku', 'en'],
+                'default_locale' => 'ar',
+
                 'groom_ar' => 'أَحْمَد',
                 'bride_ar' => 'سِدْرَة',
                 'groom_latin' => 'Ahmad',
                 'bride_latin' => 'Sidra',
-                'hosts' => 'تتشرف عائلة السالم وعائلة الحسن بدعوتكم لحضور حفل زفاف ولديهما',
+
                 // Built in the event's own zone. `now()` is UTC here, so
-                // setting 19:00 on that would land at 22:00 in Amman.
-                'starts_at' => CarbonImmutable::now('Asia/Amman')->addMonths(4)->setTime(19, 0),
-                'timezone' => 'Asia/Amman',
+                // setting 19:00 on that would land at 22:00 in Baghdad.
+                'starts_at' => CarbonImmutable::now('Asia/Baghdad')->addMonths(4)->setTime(19, 0),
+                'timezone' => 'Asia/Baghdad',
                 'duration_hours' => 5,
-                'venue_name' => 'قاعة الفورسيزونز',
-                'venue_city' => 'عمّان، الأردن',
-                'map_query' => 'Four Seasons Hotel Amman',
-                'phone' => '+962790000000',
-                'programme' => [
-                    ['time' => '٧:٠٠', 'title' => 'استقبال الضيوف'],
-                    ['time' => '٨:٠٠', 'title' => 'الزفة'],
-                    ['time' => '٩:٠٠', 'title' => 'العشاء'],
-                    ['time' => '١٠:٣٠', 'title' => 'قطع الكيكة'],
+
+                'hosts' => [
+                    'ar' => 'تتشرف عائلة السالم وعائلة الحسن بدعوتكم لحضور حفل زفاف ولديهما',
+                    'ku' => 'خێزانی ساڵم و خێزانی حەسەن بە خۆشحاڵییەوە بانگهێشتتان دەکەن بۆ ئاهەنگی هاوسەرگیری منداڵەکانیان',
+                    'en' => 'The Al-Salem and Al-Hassan families request the honour of your presence at the wedding of their children',
                 ],
+                'venue_name' => [
+                    'ar' => 'قاعة بابل',
+                    'ku' => 'هۆڵی بابل',
+                    'en' => 'Babylon Hall',
+                ],
+                'venue_city' => [
+                    'ar' => 'بغداد، العراق',
+                    'ku' => 'بەغدا، عێراق',
+                    'en' => 'Baghdad, Iraq',
+                ],
+                'programme' => [
+                    'ar' => [
+                        ['time' => '٧:٠٠', 'title' => 'استقبال الضيوف'],
+                        ['time' => '٨:٠٠', 'title' => 'الزفة'],
+                        ['time' => '٩:٠٠', 'title' => 'العشاء'],
+                        ['time' => '١٠:٣٠', 'title' => 'قطع الكيكة'],
+                    ],
+                    'ku' => [
+                        ['time' => '٧:٠٠', 'title' => 'پێشوازی لە میوانان'],
+                        ['time' => '٨:٠٠', 'title' => 'زەفە'],
+                        ['time' => '٩:٠٠', 'title' => 'نانی ئێوارە'],
+                        ['time' => '١٠:٣٠', 'title' => 'بڕینی کێک'],
+                    ],
+                    'en' => [
+                        ['time' => '7:00', 'title' => 'Guests received'],
+                        ['time' => '8:00', 'title' => 'Wedding procession'],
+                        ['time' => '9:00', 'title' => 'Dinner served'],
+                        ['time' => '10:30', 'title' => 'Cutting of the cake'],
+                    ],
+                ],
+
+                'map_query' => 'Baghdad',
+                'phone' => '+9647700000000',
                 'show_verse' => true,
                 'published' => true,
             ]

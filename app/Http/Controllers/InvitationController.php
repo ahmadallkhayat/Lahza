@@ -10,18 +10,24 @@ use Illuminate\Support\Facades\App;
 
 /**
  * The guest-facing invitation. Read-only and unauthenticated.
+ *
+ * An invitation can be issued in several languages, each with its own link, so
+ * a specific language can be sent to the guests who read it.
  */
 class InvitationController extends Controller
 {
-    public function show(Invitation $invitation): Response
+    public function show(Invitation $invitation, ?string $locale = null): Response
     {
         $this->guard($invitation);
 
-        $invitation->load('template');
+        // An unknown or unenabled locale in the URL is not an error: fall back
+        // to the invitation's default rather than 404 on a mistyped link.
+        $invitation->load('template')->renderIn($locale ?? $invitation->defaultLocale());
+
         $this->applyLocale($invitation);
 
         abort_unless($invitation->template->isRenderable(), 500,
-            'This invitation points at a template view that does not exist.');
+            'This invitation points at a base template that does not exist.');
 
         return response()->view($invitation->template->viewName(), [
             'invitation' => $invitation,
@@ -30,9 +36,12 @@ class InvitationController extends Controller
     }
 
     /** For Apple Calendar, Outlook and anything else that speaks .ics. */
-    public function calendar(Invitation $invitation): Response
+    public function calendar(Invitation $invitation, ?string $locale = null): Response
     {
         $this->guard($invitation);
+
+        $invitation->renderIn($locale ?? $invitation->defaultLocale());
+        $this->applyLocale($invitation);
 
         return response(EventCalendar::ics($invitation), 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',
@@ -50,12 +59,12 @@ class InvitationController extends Controller
     }
 
     /**
-     * Render in the invitation's language, not the studio's, so labels and
+     * Render in the language of the link, not the studio's, so labels and
      * translated month names match what the guest is reading.
      */
     private function applyLocale(Invitation $invitation): void
     {
-        App::setLocale($invitation->locale);
-        Carbon::setLocale($invitation->locale === 'ku' ? 'ckb' : $invitation->locale);
+        App::setLocale($invitation->locale());
+        Carbon::setLocale($invitation->locale() === 'ku' ? 'ckb' : $invitation->locale());
     }
 }

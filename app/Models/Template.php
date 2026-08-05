@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\BaseTemplates;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -36,8 +37,7 @@ class Template extends Model
     protected $fillable = [
         'name',
         'slug',
-        'category',
-        'view',
+        'base_template',
         'description',
         'intro_video',
         'music',
@@ -78,21 +78,22 @@ class Template extends Model
         return array_merge(self::DEFAULT_SETTINGS, $this->settings ?? []);
     }
 
-    /** Blade view that renders this design. */
+    /** Blade view of the base template this theme is built on. */
     public function viewName(): string
     {
-        return 'templates.'.$this->view.'.show';
+        return BaseTemplates::view((string) $this->base_template);
     }
 
-    /** Whether the Blade file this record points at actually exists. */
+    /** Whether the base template this record points at actually exists. */
     public function isRenderable(): bool
     {
         return view()->exists($this->viewName());
     }
 
-    /** Human label for the category, from config. */
-    public function categoryLabel(): string
+    /** Human label for the base template, e.g. "Lux Wedding". */
+    public function baseTemplateLabel(): string
     {
-        return config('templates.categories.'.$this->category, $this->category);
+        return BaseTemplates::available()[$this->base_template]
+            ?? (string) $this->base_template;
     }
 }

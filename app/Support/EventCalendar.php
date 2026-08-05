@@ -19,7 +19,7 @@ final class EventCalendar
             'dates' => $invitation->startsAtLocal()->utc()->format('Ymd\THis\Z')
                 .'/'.$invitation->endsAtLocal()->utc()->format('Ymd\THis\Z'),
             'location' => self::location($invitation),
-            'details' => route('invitations.show', $invitation),
+            'details' => self::url($invitation),
             'ctz' => $invitation->timezone,
         ]);
     }
@@ -33,7 +33,7 @@ final class EventCalendar
         $lines = [
             'BEGIN:VCALENDAR',
             'VERSION:2.0',
-            'PRODID:-//Lahza//Invitation//'.strtoupper($invitation->locale),
+            'PRODID:-//Lahza//Invitation//'.strtoupper($invitation->locale()),
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
             'BEGIN:VEVENT',
@@ -43,7 +43,7 @@ final class EventCalendar
             'DTEND:'.$invitation->endsAtLocal()->utc()->format('Ymd\THis\Z'),
             'SUMMARY:'.self::escape(self::title($invitation)),
             'LOCATION:'.self::escape(self::location($invitation)),
-            'URL:'.route('invitations.show', $invitation),
+            'URL:'.self::url($invitation),
             'END:VEVENT',
             'END:VCALENDAR',
         ];
@@ -51,18 +51,27 @@ final class EventCalendar
         return implode("\r\n", $lines)."\r\n";
     }
 
+    /** Link back in the same language, so the guest returns to what they read. */
+    private static function url(Invitation $invitation): string
+    {
+        return $invitation->locale() === $invitation->defaultLocale()
+            ? route('invitations.show', $invitation)
+            : route('invitations.show.locale', [$invitation, $invitation->locale()]);
+    }
+
     private static function title(Invitation $invitation): string
     {
-        return $invitation->locale === 'en' && filled($invitation->groom_latin)
+        return $invitation->locale() === 'en' && filled($invitation->groom_latin)
             ? trim($invitation->groom_latin.' & '.$invitation->bride_latin)
             : trim($invitation->groom_ar.' & '.$invitation->bride_ar);
     }
 
+    /** Venue in the language of the link this file was downloaded from. */
     private static function location(Invitation $invitation): string
     {
         return trim(implode(', ', array_filter([
-            $invitation->venue_name,
-            $invitation->venue_city,
+            $invitation->text('venue_name'),
+            $invitation->text('venue_city'),
         ])));
     }
 

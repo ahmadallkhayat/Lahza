@@ -22,7 +22,12 @@ class InvitationController extends Controller
     public function create(): View
     {
         return view('admin.invitations.create', [
-            'invitation' => new Invitation(['timezone' => 'Asia/Amman', 'duration_hours' => 5]),
+            'invitation' => new Invitation([
+                'timezone' => config('templates.default_timezone'),
+                'duration_hours' => 5,
+                'locales' => ['ar'],
+                'default_locale' => 'ar',
+            ]),
             'templates' => $this->selectableTemplates(),
         ]);
     }
@@ -90,7 +95,7 @@ class InvitationController extends Controller
      */
     private function uniqueSlug(array $data): string
     {
-        $names = trim(($data['groom_latin'] ?? '').' '.($data['bride_latin'] ?? ''))
+        $names = trim(($data['groom_latin'] ?? '').'-'.($data['bride_latin'] ?? ''), '-')
             ?: $data['groom_ar'].' '.$data['bride_ar'];
 
         // Str::slug transliterates Arabic; the fallback covers names that

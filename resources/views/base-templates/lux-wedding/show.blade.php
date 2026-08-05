@@ -10,7 +10,18 @@
     $s = $template->settings();
 
     $rtl = $invitation->isRtl();
-    $locale = $invitation->locale;
+    $locale = $invitation->locale();
+
+    // One link per language. The switcher only appears when there is a choice.
+    $otherLocales = collect($invitation->localeList())->reject(fn ($l) => $l === $locale);
+
+    $localeUrl = fn (string $l) => $l === $invitation->defaultLocale()
+        ? route('invitations.show', $invitation)
+        : route('invitations.show.locale', [$invitation, $l]);
+
+    $calendarUrl = $locale === $invitation->defaultLocale()
+        ? route('invitations.calendar', $invitation)
+        : route('invitations.calendar.locale', [$invitation, $locale]);
 
     // Names and the verse are Arabic in every locale, so Aref Ruqaa and Amiri
     // always load. Kurdish must not use Cairo — Cairo has no glyphs for
@@ -55,8 +66,8 @@
 {{-- WhatsApp is the distribution channel, so the preview card matters. --}}
 <meta property="og:type" content="website">
 <meta property="og:title" content="{{ $invitation->groom_ar }} & {{ $invitation->bride_ar }}">
-<meta property="og:description" content="{{ $invitation->formattedDate() }}{{ $invitation->venue_name ? ' — '.$invitation->venue_name : '' }}">
-<meta property="og:url" content="{{ route('invitations.show', $invitation) }}">
+<meta property="og:description" content="{{ $invitation->formattedDate() }}{{ $invitation->text('venue_name') ? ' — '.$invitation->text('venue_name') : '' }}">
+<meta property="og:url" content="{{ $localeUrl($locale) }}">
 <meta name="twitter:card" content="summary_large_image">
 
 <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
@@ -387,6 +398,36 @@ html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.06rem; line-h
 #mute.on { display: grid; }
 #mute svg { width: 1.1rem; height: 1.1rem; stroke-width: 1.6; }
 
+/* ─── Language switcher ──────────────────────────────────────────
+   Only rendered when the invitation is issued in more than one
+   language, and only after the reveal, so it never sits over the
+   intro. Deliberately quiet — a guest needs it once. */
+#langs {
+  position: fixed;
+  inset-block-start: 1.15rem;
+  inset-inline-end: 1.15rem;
+  z-index: 40;
+  display: none;
+  gap: .3rem;
+}
+#langs.on { display: flex; }
+#langs a {
+  min-width: 2.1rem;
+  padding: .35rem .5rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+  background: color-mix(in srgb, var(--paper) 80%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: var(--gold-deep);
+  font-family: var(--f-ui);
+  font-size: .68rem;
+  text-align: center;
+  text-decoration: none;
+  line-height: 1.3;
+}
+#langs a:hover { background: color-mix(in srgb, var(--gold) 16%, var(--paper)); }
+
 footer {
   margin-top: 3.5rem;
   font-size: .7rem;
@@ -424,6 +465,19 @@ footer {
     </button>
 @endif
 
+@if ($otherLocales->isNotEmpty())
+    <nav id="langs" aria-label="{{ __('invitation.language') }}">
+        @foreach ($otherLocales as $other)
+            <a
+                href="{{ $localeUrl($other) }}"
+                hreflang="{{ $other }}"
+                lang="{{ $other }}"
+                data-switch
+            >{{ config("templates.locales.{$other}.short", strtoupper($other)) }}</a>
+        @endforeach
+    </nav>
+@endif
+
 <main id="content">
 
     @if ($invitation->show_verse)
@@ -436,9 +490,9 @@ footer {
         </section>
     @endif
 
-    @if ($invitation->hosts)
+    @if ($hosts = $invitation->text('hosts'))
         <section>
-            <p class="hosts">{{ $invitation->hosts }}</p>
+            <p class="hosts">{{ $hosts }}</p>
         </section>
     @endif
 
@@ -470,11 +524,16 @@ footer {
         <p class="begun" id="begun" hidden>{{ __('invitation.begun') }}</p>
     </section>
 
-    @if ($invitation->venue_name || $invitation->venue_city)
+    @php
+        $venueName = $invitation->text('venue_name');
+        $venueCity = $invitation->text('venue_city');
+    @endphp
+
+    @if ($venueName || $venueCity)
         <section>
             <p class="label">{{ __('invitation.venue') }}</p>
             <p class="venue">
-                {{ $invitation->venue_name }}@if ($invitation->venue_name && $invitation->venue_city)<br>@endif{{ $invitation->venue_city }}
+                {{ $venueName }}@if ($venueName && $venueCity)<br>@endif{{ $venueCity }}
             </p>
         </section>
     @endif
@@ -501,7 +560,7 @@ footer {
             </a>
         @endif
 
-        <a class="btn" href="{{ route('invitations.calendar', $invitation) }}">
+        <a class="btn" href="{{ $calendarUrl }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>
             {{ __('invitation.calendar') }}
         </a>
@@ -528,6 +587,7 @@ const promptEl = document.getElementById('prompt');
 const music    = document.getElementById('music');
 const content  = document.getElementById('content');
 const muteBtn  = document.getElementById('mute');
+const langs    = document.getElementById('langs');
 const cd       = document.getElementById('countdown');
 const begun    = document.getElementById('begun');
 
@@ -595,7 +655,10 @@ function startMusic() {
         rampVolume(1, CONFIG.musicFadeMs);
     }
 
-    music.play().then(() => muteBtn && muteBtn.classList.add('on')).catch(() => {});
+    music.play().then(() => {
+        musicStarted = true;
+        muteBtn && muteBtn.classList.add('on');
+    }).catch(() => {});
 }
 
 /* Pull back and blur once the invitation is on screen. */
@@ -609,8 +672,19 @@ function settleMusic() {
     }
 }
 
+let musicStarted = false;
+
 if (muteBtn) {
     muteBtn.addEventListener('click', () => {
+        // Arriving via the language switcher skips the intro, so the music was
+        // never started and there has been no gesture to allow it. This click
+        // is that gesture.
+        if (!musicStarted) {
+            startMusic();
+
+            return;
+        }
+
         muted = !muted;
         if (muteNode) muteNode.gain.value = muted ? 0 : 1;
         else music.muted = muted;
@@ -677,6 +751,7 @@ function reveal() {
     curtain.classList.add('gone');
     content.classList.add('revealed');
     if (muteBtn) muteBtn.classList.add('on');
+    if (langs) langs.classList.add('on');
     settleMusic();
 
     // Let the clip run through the whole dissolve — pausing here is what
@@ -686,6 +761,41 @@ function reveal() {
         curtain.remove();
     }, CONFIG.crossfadeMs + 200);
 }
+
+/* ── language switching ─────────────────────────────────────────
+   Each language is its own URL so a single language can be sent to the
+   guests who read it. Switching therefore reloads — and replaying a
+   ten-second intro to read the same invitation again would be tedious,
+   so the destination is told to skip straight to the content.
+
+   Music cannot resume by itself after a navigation: there has been no
+   gesture on the new page. The music button handles that. */
+const SKIP_KEY = 'lahza:skip-intro';
+
+if (langs) {
+    langs.querySelectorAll('[data-switch]').forEach(link => {
+        link.addEventListener('click', () => {
+            try { sessionStorage.setItem(SKIP_KEY, '1'); } catch {}
+        });
+    });
+}
+
+function skipIntro() {
+    revealed = true;
+    opened = true;
+
+    curtain.remove();
+    content.classList.add('revealed');
+    if (muteBtn) muteBtn.classList.add('on');
+    if (langs) langs.classList.add('on');
+}
+
+try {
+    if (sessionStorage.getItem(SKIP_KEY)) {
+        sessionStorage.removeItem(SKIP_KEY);
+        skipIntro();
+    }
+} catch { /* private mode: the intro just plays again */ }
 
 /* ── countdown ──────────────────────────────────────────────────── */
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
