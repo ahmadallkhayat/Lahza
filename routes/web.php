@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\InvitationController as AdminInvitationController;
 use App\Http\Controllers\Admin\LoginController;
 use App\Http\Controllers\Admin\TemplateController;
+use App\Http\Controllers\Admin\TranslateController;
 use App\Http\Controllers\InvitationController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,5 +59,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('invitations', AdminInvitationController::class)->except('show');
         Route::patch('invitations/{invitation}/publish', [AdminInvitationController::class, 'togglePublish'])
             ->name('invitations.publish');
+
+        // Fills the other languages from the English content. Throttled
+        // because every call goes out to a third-party API.
+        Route::post('translate', TranslateController::class)
+            ->middleware('throttle:20,1')
+            ->name('translate');
     });
 });

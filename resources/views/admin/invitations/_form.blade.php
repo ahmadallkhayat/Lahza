@@ -1,32 +1,46 @@
 @php
     $local = $invitation->exists ? $invitation->startsAtLocal() : null;
-    $codes = array_keys(config('templates.locales'));
+    $localeMeta = config('templates.locales');
+    $codes = array_keys($localeMeta);
+    $translatable = ['hosts', 'venue_name', 'venue_city'];
 
-    $selected = array_values(array_intersect(
-        $codes,
-        (array) old('locales', $invitation->localeList())
-    )) ?: ['ar'];
+    $selected = array_values(array_intersect($codes, (array) old('locales', $invitation->localeList()))) ?: ['ar'];
 
     $default = old('default_locale', $invitation->exists ? $invitation->defaultLocale() : 'ar');
     $default = in_array($default, $selected, true) ? $default : $selected[0];
 
-    // Every language starts with an array so the repeater has something to bind
-    // to, whether or not it has rows yet.
-    $programme = collect($codes)
-        ->mapWithKeys(fn ($code) => [
-            $code => array_values((array) old("programme.$code", data_get($invitation->programme, $code, []))),
+    // Every language gets a slot whether or not it is ticked, so text typed
+    // into one, unticked and reticked, is still there.
+    $text = collect($translatable)
+        ->mapWithKeys(fn ($field) => [$field => collect($codes)
+            ->mapWithKeys(fn ($c) => [$c => (string) old("$field.$c", data_get($invitation->{$field}, $c, ''))])
+            ->all(),
         ])
         ->all();
 
-    $shortLabels = collect(config('templates.locales'))
-        ->map(fn ($meta) => $meta['label'])
+    // The programme is stored per language but edited as aligned rows: one row
+    // is one moment of the evening, described in each language. Zip the stored
+    // arrays by index to rebuild that view of it.
+    $byLocale = collect($codes)
+        ->mapWithKeys(fn ($c) => [
+            $c => array_values((array) old("programme.$c", data_get($invitation->programme, $c, []))),
+        ])
         ->all();
 
-    // Per-language value for a translated field.
-    $textFor = fn (string $field, string $code) => old(
-        "$field.$code",
-        data_get($invitation->{$field}, $code)
-    );
+    $stepCount = max([0, ...array_map('count', $byLocale)]);
+
+    $steps = [];
+    for ($i = 0; $i < $stepCount; $i++) {
+        $steps[] = collect($codes)
+            ->mapWithKeys(fn ($c) => [$c => [
+                'time' => (string) ($byLocale[$c][$i]['time'] ?? ''),
+                'title' => (string) ($byLocale[$c][$i]['title'] ?? ''),
+            ]])
+            ->all();
+    }
+
+    $labels = collect($localeMeta)->map(fn ($m) => $m['label'])->all();
+    $numerals = collect($localeMeta)->map(fn ($m) => $m['numerals'])->all();
 @endphp
 
 <div
@@ -34,8 +48,17 @@
     x-data="{
         locales: @js($selected),
         def: @js($default),
-        labels: @js($shortLabels),
-        programme: @js($programme),
+        labels: @js($labels),
+        numerals: @js($numerals),
+        fields: @js($translatable),
+
+        text: @js($text),
+        steps: @js($steps),
+
+        reviewed: {},
+        translating: false,
+        translateNote: '',
+        translateOk: false,
 
         has(code) { return this.locales.includes(code) },
 
@@ -51,10 +74,106 @@
             // The default has to stay one of the chosen languages.
             if (! this.has(this.def)) this.def = this.locales[0];
         },
+
+        addStep() {
+            const blank = {};
+            Object.keys(this.labels).forEach(c => blank[c] = { time: '', title: '' });
+            this.steps.push(blank);
+        },
+
+        /* Times differ between languages only in their digits, so they are
+           converted rather than translated — no API call, always correct. */
+        localiseDigits(value, code) {
+            if (this.numerals[code] !== 'arab') return value;
+            const arab = '٠١٢٣٤٥٦٧٨٩';
+            return String(value).replace(/[0-9]/g, d => arab[d]);
+        },
+
+        async translateFromEnglish() {
+            if (this.translating) return;
+
+            const targets = this.locales.filter(c => c !== 'en');
+            if (! this.has('en') || targets.length === 0) return;
+
+            // Keys tell the response where each string belongs.
+            const texts = {};
+            this.fields.forEach(field => {
+                const value = (this.text[field]['en'] || '').trim();
+                if (value) texts['text:' + field] = value;
+            });
+            this.steps.forEach((step, i) => {
+                const title = (step.en?.title || '').trim();
+                if (title) texts['step:' + i + ':title'] = title;
+            });
+
+            if (Object.keys(texts).length === 0) {
+                this.translateOk = false;
+                this.translateNote = 'Fill in the English content first.';
+                return;
+            }
+
+            this.translating = true;
+            this.translateNote = '';
+
+            try {
+                const response = await fetch(@js(route('admin.translate')), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']')?.content ?? '',
+                    },
+                    body: JSON.stringify({ source: 'en', targets, texts }),
+                });
+
+                if (! response.ok) throw new Error('Request failed');
+
+                const data = await response.json();
+                this.applyTranslations(data);
+            } catch (e) {
+                this.translateOk = false;
+                this.translateNote = 'The translation request failed. Nothing was changed.';
+            } finally {
+                this.translating = false;
+            }
+        },
+
+        applyTranslations(data) {
+            const filled = [];
+
+            for (const [code, values] of Object.entries(data.translations || {})) {
+                for (const [key, value] of Object.entries(values)) {
+                    if (key.startsWith('text:')) {
+                        this.text[key.slice(5)][code] = value;
+                    } else if (key.startsWith('step:')) {
+                        const i = Number(key.split(':')[1]);
+                        if (this.steps[i]) this.steps[i][code].title = value;
+                    }
+                }
+
+                // Times are digit conversions, not translations.
+                this.steps.forEach(step => {
+                    if (step.en?.time) step[code].time = this.localiseDigits(step.en.time, code);
+                });
+
+                this.reviewed[code] = true;
+                filled.push(this.labels[code]);
+            }
+
+            const declined = Object.values(data.declined || {});
+
+            this.translateOk = filled.length > 0;
+            this.translateNote = [
+                filled.length
+                    ? `Filled ${filled.join(' and ')} from English via ${data.provider}. Machine output — read it before publishing.`
+                    : 'Nothing was translated.',
+                ...declined,
+            ].join(' ');
+        },
     }"
 >
 
-<x-ui.card title="Theme &amp; languages">
+<x-ui.card title="Theme & languages">
     <div class="space-y-5">
         <x-ui.field label="Theme" name="template_id" required>
             <x-ui.select name="template_id" required>
@@ -69,12 +188,11 @@
         <div>
             <x-ui.label>Languages <span class="text-bad-600" aria-hidden="true">*</span></x-ui.label>
             <p class="mb-2.5 text-xs text-ink-500">
-                Each language gets its own guest link, and its own content below.
-                Direction, fonts, digits and month names follow the language.
+                Each language gets its own guest link. Direction, fonts, digits and month names follow it.
             </p>
 
             <div class="flex flex-wrap gap-2">
-                @foreach (config('templates.locales') as $code => $meta)
+                @foreach ($localeMeta as $code => $meta)
                     <label
                         class="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors"
                         :class="has('{{ $code }}')
@@ -153,6 +271,8 @@
     </div>
 </x-ui.card>
 
+@include('admin.invitations._content-card')
+
 <x-ui.card title="When" description="The countdown runs to this moment in the event's own timezone.">
     <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <x-ui.field label="Date" name="date" required>
@@ -216,103 +336,6 @@
         </x-ui.field>
     </div>
 </x-ui.card>
-
-{{-- One content block per language, shown only while that language is ticked.
-     Inputs stay in the DOM so nothing typed is lost by unticking and reticking;
-     the request drops any language not selected on save. --}}
-@foreach (config('templates.locales') as $code => $meta)
-    <div x-show="has('{{ $code }}')" x-cloak>
-        <x-ui.card :title="$meta['label'].' content'">
-            <x-slot:actions>
-                <x-ui.badge tone="brand" x-show="def === '{{ $code }}'" x-cloak>Default</x-ui.badge>
-                <code class="text-xs text-ink-500">/i/{{ $invitation->slug ?: '…' }}@if ($code !== $default)/{{ $code }}@endif</code>
-            </x-slot:actions>
-
-            <div class="grid gap-5 sm:grid-cols-2" @if ($meta['rtl']) dir="rtl" @endif>
-                <x-ui.field
-                    :label="'Hosting line'"
-                    :name="'hosts.'.$code"
-                    :for="'hosts_'.$code"
-                    class="sm:col-span-2"
-                    hint="The families extending the invitation."
-                >
-                    <x-ui.textarea
-                        :name="'hosts['.$code.']'"
-                        :id="'hosts_'.$code"
-                        rows="2"
-                    >{{ $textFor('hosts', $code) }}</x-ui.textarea>
-                </x-ui.field>
-
-                <x-ui.field :label="'Venue'" :name="'venue_name.'.$code" :for="'venue_name_'.$code">
-                    <x-ui.input
-                        :name="'venue_name['.$code.']'"
-                        :id="'venue_name_'.$code"
-                        :value="$textFor('venue_name', $code)"
-                    />
-                </x-ui.field>
-
-                <x-ui.field :label="'City'" :name="'venue_city.'.$code" :for="'venue_city_'.$code">
-                    <x-ui.input
-                        :name="'venue_city['.$code.']'"
-                        :id="'venue_city_'.$code"
-                        :value="$textFor('venue_city', $code)"
-                    />
-                </x-ui.field>
-            </div>
-
-            {{-- Programme for this language --}}
-            <div class="mt-6 border-t border-ink-200 pt-5">
-                <div class="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-medium text-ink-900">Programme</p>
-                        <p class="text-xs text-ink-500">The order of the evening. Blank rows are discarded on save.</p>
-                    </div>
-                    <x-ui.button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        icon="plus"
-                        x-on:click="programme['{{ $code }}'].push({ time: '', title: '' })"
-                    >
-                        Add row
-                    </x-ui.button>
-                </div>
-
-                <div class="space-y-3" @if ($meta['rtl']) dir="rtl" @endif>
-                    <template x-for="(row, i) in programme['{{ $code }}']" :key="i">
-                        <div class="flex items-start gap-3">
-                            <input
-                                type="text"
-                                :name="`programme[{{ $code }}][${i}][time]`"
-                                x-model="row.time"
-                                placeholder="{{ $meta['numerals'] === 'arab' ? '٧:٠٠' : '7:00' }}"
-                                class="w-28 shrink-0 rounded-lg border-ink-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                aria-label="Time"
-                            >
-                            <input
-                                type="text"
-                                :name="`programme[{{ $code }}][${i}][title]`"
-                                x-model="row.title"
-                                class="w-full rounded-lg border-ink-300 text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                aria-label="What happens"
-                            >
-                            <button
-                                type="button"
-                                x-on:click="programme['{{ $code }}'].splice(i, 1)"
-                                class="rounded-md p-2 text-ink-400 hover:bg-bad-50 hover:text-bad-600"
-                            >
-                                <x-heroicon-o-trash class="h-4 w-4" />
-                                <span class="sr-only">Remove row</span>
-                            </button>
-                        </div>
-                    </template>
-
-                    <p x-show="programme['{{ $code }}'].length === 0" class="text-sm text-ink-400">No programme rows.</p>
-                </div>
-            </div>
-        </x-ui.card>
-    </div>
-@endforeach
 
 <x-ui.card title="Publishing">
     <label class="flex items-start gap-2.5 text-sm text-ink-700">

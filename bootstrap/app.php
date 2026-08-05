@@ -18,7 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo('/admin');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // The skeleton only checks for api/* here, which silently turned the
+        // studio's JSON endpoints into HTML redirects — a failed validation
+        // came back as a 302 to the login page rather than a 422 with errors.
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
     })->create();
