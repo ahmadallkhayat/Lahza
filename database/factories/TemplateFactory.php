@@ -18,7 +18,7 @@ class TemplateFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name),
-            'base_template' => 'lux-wedding',
+            'base_template' => 'luxury-wedding-v1',
             'description' => null,
             'intro_video' => '/storage/templates/videos/test.mp4',
             'music' => '/storage/templates/music/test.mp3',

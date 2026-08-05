@@ -94,7 +94,11 @@
     </div>
 
     <main class="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <div class="mx-auto max-w-6xl">
+        {{-- @container so pages can lay out against the width they actually
+             have, not the viewport. A viewport breakpoint would be wrong here:
+             the sidebar takes 16rem off, so `lg` means far less usable width
+             than it looks. --}}
+        <div class="@container mx-auto max-w-7xl">
             @if (session('status'))
                 <x-ui.alert tone="ok" class="mb-6">{{ session('status') }}</x-ui.alert>
             @endif

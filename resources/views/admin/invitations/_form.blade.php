@@ -126,7 +126,10 @@
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']')?.content ?? '',
+                        {{-- Inlined rather than read from a meta tag: an
+                             attribute selector here needs quotes, and quotes
+                             inside this attribute are what break it. --}}
+                        'X-CSRF-TOKEN': @js(csrf_token()),
                     },
                     body: JSON.stringify({ source: 'en', targets, texts }),
                 });

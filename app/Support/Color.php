@@ -228,6 +228,23 @@ final class Color
     }
 
     /**
+     * Rotate the hue, keeping saturation and lightness.
+     *
+     * Used to offer a complementary accent alongside the one actually in the
+     * footage: still anchored to the clip's own colour, just the opposite side
+     * of the wheel, which is a harmony rather than an unrelated choice.
+     *
+     * @param  array{0:int,1:int,2:int}  $rgb
+     * @return array{0:int,1:int,2:int}
+     */
+    public static function rotateHue(array $rgb, float $degrees): array
+    {
+        [$h, $s, $l] = self::toHsl($rgb);
+
+        return self::fromHsl($h + $degrees, $s, $l);
+    }
+
+    /**
      * Move a colour to a given lightness, keeping its hue and saturation.
      *
      * This is what `lighten()` cannot do. lighten() is a relative nudge with no

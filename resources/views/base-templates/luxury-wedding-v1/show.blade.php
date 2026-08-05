@@ -1,6 +1,6 @@
 @php
     /**
-     * Lux Wedding.
+     * Luxury Wedding V1.
      *
      * Ported from archive/lux-wedding/invitation.html. Everything that was
      * hardcoded there now arrives as data: colours and timings from the
@@ -595,10 +595,15 @@ const LABELS = { mute: @json(__('invitation.mute')), unmute: @json(__('invitatio
 
 /* ── audio ──────────────────────────────────────────────────────
    The muffled "next room" effect is a low-pass filter, which only the
-   Web Audio API can do. createMediaElementSource reads media as an
-   opaque origin under file:// and cannot be undone, so the graph is
-   only built when served over http(s). */
-const CAN_FILTER = location.protocol === 'http:' || location.protocol === 'https:';
+   Web Audio API can do.
+
+   Only file:// is excluded. There, createMediaElementSource reads the
+   media as an opaque origin and yields silence, and the call cannot be
+   undone. Everything else is fine — including about:srcdoc, which is
+   what the studio's preview frame runs as. Testing for http(s)
+   instead, as this once did, silently dropped the filter in that frame
+   and the preview lost the muffle the real page has. */
+const CAN_FILTER = location.protocol !== 'file:';
 let actx = null, fogNode = null, duckNode = null, muteNode = null, muted = false;
 
 function buildAudioGraph() {

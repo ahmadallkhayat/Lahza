@@ -24,6 +24,6 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $this->call(LuxWeddingSeeder::class);
+        $this->call(LuxuryWeddingV1Seeder::class);
     }
 }

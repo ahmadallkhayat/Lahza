@@ -38,6 +38,7 @@ class TemplateRequest extends FormRequest
                 'mimetypes:audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/aac,audio/mp4,audio/x-m4a,audio/flac,audio/x-flac',
                 'max:'.config('templates.max_music_kb'),
             ],
+            'remove_video' => ['nullable', 'boolean'],
             'remove_music' => ['nullable', 'boolean'],
             'derive_palette' => ['nullable', 'boolean'],
 
@@ -75,19 +76,44 @@ class TemplateRequest extends FormRequest
     {
         $data = $this->validated();
 
-        $data['palette'] = array_intersect_key(
-            array_filter($data['palette'] ?? [], fn ($v) => filled($v)),
-            Template::DEFAULT_PALETTE
-        );
+        // Only touch these when the request actually carries them. Defaulting
+        // an absent key to an empty array meant a save that never mentioned
+        // colours wiped the ones already stored — quiet data loss, and
+        // especially unwelcome after they were derived from a video.
+        if ($this->has('palette')) {
+            $data['palette'] = array_intersect_key(
+                array_filter($data['palette'] ?? [], fn ($v) => filled($v)),
+                Template::DEFAULT_PALETTE
+            );
+        } else {
+            unset($data['palette']);
+        }
 
-        $data['settings'] = array_intersect_key(
-            array_filter($data['settings'] ?? [], fn ($v) => $v !== null && $v !== ''),
-            Template::DEFAULT_SETTINGS
-        );
+        if ($this->has('settings')) {
+            $settings = array_intersect_key(
+                array_filter($data['settings'] ?? [], fn ($v) => $v !== null && $v !== ''),
+                Template::DEFAULT_SETTINGS
+            );
 
+            // Stored as numbers, not the strings a form sends. The model casts
+            // on read too, but there is no reason to keep strings in the column
+            // when the shape is known here.
+            foreach ($settings as $key => $value) {
+                $settings[$key] = is_float(Template::DEFAULT_SETTINGS[$key])
+                    ? (float) $value
+                    : (int) $value;
+            }
+
+            $data['settings'] = $settings;
+        } else {
+            unset($data['settings']);
+        }
+
+        // A checkbox absent from a submitted form genuinely means unticked, so
+        // this one is read rather than preserved.
         $data['is_active'] = $this->boolean('is_active');
 
-        unset($data['remove_music'], $data['derive_palette']);
+        unset($data['remove_video'], $data['remove_music'], $data['derive_palette']);
 
         return $data;
     }

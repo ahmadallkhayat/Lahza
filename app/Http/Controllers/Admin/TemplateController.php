@@ -60,30 +60,16 @@ class TemplateController extends Controller
         $data = $request->cleaned();
         $data['slug'] = $data['slug'] ?? $template->slug;
 
-        if ($video = MediaStore::put($request, 'intro_video', 'templates/videos')) {
-            MediaStore::forget($template->intro_video);
-            $data['intro_video'] = $video;
-        } else {
-            unset($data['intro_video']);
-        }
+        $this->applyMedia($request, $data, $template, 'intro_video', 'templates/videos', 'remove_video');
+        $this->applyMedia($request, $data, $template, 'music', 'templates/music', 'remove_music');
 
-        if ($music = MediaStore::put($request, 'music', 'templates/music')) {
-            MediaStore::forget($template->music);
-            $data['music'] = $music;
-        } else {
-            unset($data['music']);
-        }
+        // array_key_exists, not ??: a removal sets the key to null on purpose,
+        // and `?? $template->intro_video` would resurrect the deleted file's URL.
+        $videoUrl = array_key_exists('intro_video', $data)
+            ? $data['intro_video']
+            : $template->intro_video;
 
-        if ($request->boolean('remove_music')) {
-            MediaStore::forget($template->music);
-            $data['music'] = null;
-        }
-
-        $note = $this->maybeDerivePalette(
-            $request,
-            $data,
-            $data['intro_video'] ?? $template->intro_video
-        );
+        $note = $this->maybeDerivePalette($request, $data, $videoUrl);
 
         $template->update($data);
 
@@ -107,9 +93,46 @@ class TemplateController extends Controller
     }
 
     /**
-     * Replace the submitted colours with ones read from the video, but only
-     * when the studio asked for it — silently overwriting hand-picked values
-     * on every save would be surprising.
+     * Settle one media field on update: replace, clear, or leave alone.
+     *
+     * A new upload wins over a tick in the remove box — asking for both most
+     * likely means "use this one instead". Absent both, the stored file is left
+     * untouched rather than nulled.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function applyMedia(
+        TemplateRequest $request,
+        array &$data,
+        Template $template,
+        string $field,
+        string $directory,
+        string $removeKey,
+    ): void {
+        if ($uploaded = MediaStore::put($request, $field, $directory)) {
+            MediaStore::forget($template->{$field});
+            $data[$field] = $uploaded;
+
+            return;
+        }
+
+        if ($request->boolean($removeKey)) {
+            MediaStore::forget($template->{$field});
+            $data[$field] = null;
+
+            return;
+        }
+
+        unset($data[$field]);
+    }
+
+    /**
+     * Set the palette from the intro video's own colours.
+     *
+     * A newly uploaded clip does this automatically: the video defines how the
+     * invitation looks, so its colours are the starting point, and requiring a
+     * separate checkbox for it meant uploading a video appeared to do nothing.
+     * The checkbox is for re-reading the colours from a clip already attached.
      *
      * Returns a note for the flash message. Extraction failing is not an
      * error: the submitted colours stand and the studio is told why.
@@ -118,14 +141,20 @@ class TemplateController extends Controller
      */
     private function maybeDerivePalette(TemplateRequest $request, array &$data, ?string $videoUrl): string
     {
-        if (! $request->boolean('derive_palette')) {
+        $fromNewUpload = $request->hasFile('intro_video');
+
+        if (! $fromNewUpload && ! $request->boolean('derive_palette')) {
             return '';
         }
 
         $path = MediaStore::absolutePath($videoUrl);
 
         if ($path === null) {
-            return 'Colours were not derived — this template has no intro video.';
+            // Only worth saying when it was asked for explicitly; a save that
+            // removed the video should not complain about the video being gone.
+            return $request->boolean('derive_palette')
+                ? 'Colours were not derived — this template has no intro video.'
+                : '';
         }
 
         $derived = $this->palettes->extract($path);

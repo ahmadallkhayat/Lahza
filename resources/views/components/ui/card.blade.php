@@ -6,8 +6,10 @@
 
 <div {{ $attributes->class('rounded-xl border border-ink-200 bg-white shadow-panel') }}>
     @if ($title || isset($actions))
-        <div class="flex items-start justify-between gap-4 border-b border-ink-200 px-5 py-4">
-            <div>
+        {{-- flex-wrap so actions drop onto their own line in a narrow card
+             rather than squeezing the title into a one-word-per-line column. --}}
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-ink-200 px-5 py-4">
+            <div class="min-w-0 flex-1 basis-40">
                 @if ($title)
                     <h2 class="text-sm font-semibold text-ink-900">{{ $title }}</h2>
                 @endif

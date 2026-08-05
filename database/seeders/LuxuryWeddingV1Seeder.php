@@ -17,15 +17,15 @@ use Illuminate\Support\Facades\Storage;
  * chocolate and ends flooded with champagne light, which is why the reveal
  * lands on warm ivory rather than cutting to black.
  */
-class LuxWeddingSeeder extends Seeder
+class LuxuryWeddingV1Seeder extends Seeder
 {
     public function run(): void
     {
         $template = Template::updateOrCreate(
-            ['slug' => 'lux-wedding'],
+            ['slug' => 'luxury-wedding-v1'],
             [
-                'name' => 'Lux Wedding',
-                'base_template' => 'lux-wedding',
+                'name' => 'Luxury Wedding V1',
+                'base_template' => 'luxury-wedding-v1',
                 'description' => 'Ring box opening onto champagne light. Ivory and gold, Arabic-first.',
                 'palette' => [
                     'paper' => '#f7f1e8',
@@ -62,8 +62,8 @@ class LuxWeddingSeeder extends Seeder
         $archive = base_path('archive/lux-wedding');
 
         $media = [
-            'intro_video' => ['Intro_video.mp4', 'templates/videos/lux-wedding-intro.mp4'],
-            'music' => ['music.mp3', 'templates/music/lux-wedding.mp3'],
+            'intro_video' => ['Intro_video.mp4', 'templates/videos/luxury-wedding-v1-intro.mp4'],
+            'music' => ['music.mp3', 'templates/music/luxury-wedding-v1.mp3'],
         ];
 
         foreach ($media as $column => [$source, $target]) {

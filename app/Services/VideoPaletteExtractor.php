@@ -8,13 +8,16 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
 /**
- * Derives a template's palette from its intro video.
+ * Derives palettes from a template's intro video.
  *
  * Frames are sampled with ffmpeg, downscaled, then quantised into colour
- * buckets. Three anchors are picked out of those buckets — the dominant dark
- * tone, the dominant bright tone, and the most colourful thing that is neither
- * — and the seven palette roles are derived from them with contrast ratios
- * enforced, so the result is always legible whatever the footage looks like.
+ * buckets. Out of those come three things: the dominant dark tone, the dominant
+ * bright tone, and a ranked list of colours that are neither.
+ *
+ * Those get combined into several complete palettes — light page or dark page,
+ * crossed with each accent worth using — so the studio picks a direction rather
+ * than being handed one answer. Every variant has the same contrast floors
+ * enforced, so whichever is chosen is legible.
  */
 class VideoPaletteExtractor
 {
@@ -34,46 +37,224 @@ class VideoPaletteExtractor
     private const CONTRAST_GOLD = 3.0;
 
     /**
-     * Target HSL lightness per role. Set in HSL rather than by lightening
-     * toward white, which would wash the hue out to grey.
-     */
-    private const L_PAPER = 0.93;
-
-    private const L_PAPER_DEEP = 0.87;
-
-    private const L_INK = 0.12;
-
-    private const L_INK_SOFT = 0.38;
-
-    private const L_GOLD = 0.45;
-
-    private const L_CURTAIN = 0.07;
-
-    /**
-     * A distinct colour only becomes the accent if it covers at least this
+     * A distinct colour only counts as an accent if it covers at least this
      * much of the sampled pixels and is meaningfully more colourful than the
-     * footage's own bright tone. Otherwise the bright tone deepened is the
-     * accent — which is how ivory-and-gold happens naturally.
+     * footage's own bright tone. Ranking on raw chroma alone picks whatever
+     * single cluster is most saturated, which on warm footage means a stray
+     * coral rather than the champagne the clip is actually built from.
      */
     private const ACCENT_MIN_WEIGHT = 0.05;
 
     private const ACCENT_CHROMA_FACTOR = 1.5;
 
+    /** How many accents to offer variants for. */
+    private const MAX_ACCENTS = 2;
+
     /**
-     * @return array<string, string>|null Palette keyed by role, or null when
-     *                                    ffmpeg is unavailable or no frame
-     *                                    could be read.
+     * Target lightness per role, per theme. Set in HSL rather than by
+     * lightening toward white, which washes the hue out to grey.
+     *
+     * On a dark page the roles invert: the panel fill lifts above the
+     * background instead of sitting below it, and text runs light.
+     */
+    private const LIGHTNESS = [
+        'light' => [
+            'paper' => 0.93, 'paper_deep' => 0.87,
+            'ink' => 0.12, 'ink_soft' => 0.38,
+            'gold' => 0.45, 'curtain' => 0.07,
+        ],
+        'dark' => [
+            'paper' => 0.11, 'paper_deep' => 0.17,
+            'ink' => 0.93, 'ink_soft' => 0.68,
+            'gold' => 0.58, 'curtain' => 0.06,
+        ],
+    ];
+
+    /**
+     * Every palette worth offering for this clip.
+     *
+     * @return array<int, array{key: string, label: string, palette: array<string, string>}>
+     */
+    public function variants(string $videoPath): array
+    {
+        $candidates = $this->candidates($videoPath);
+
+        if ($candidates === []) {
+            return [];
+        }
+
+        $best = fn (callable $score) => collect($candidates)->sortByDesc($score)->first()['rgb'];
+
+        // Weighted against lightness, so these follow the footage rather than
+        // picking the single darkest or brightest stray cluster.
+        $dark = $best(fn ($c) => $c['weight'] * (1 - $c['lightness']));
+        $bright = $best(fn ($c) => $c['weight'] * $c['lightness']);
+
+        $accents = $this->accents($candidates, $dark, $bright);
+
+        // Warm monochrome footage yields only one accent, which would leave two
+        // near-identical variants to choose between. The complement of that
+        // accent is still anchored to the clip's own hue — the opposite side of
+        // the wheel is a harmony, not an unrelated colour — so it gives a
+        // genuinely different direction that still coordinates.
+        $accents[] = Color::rotateHue($accents[0], 180);
+
+        $variants = [];
+
+        foreach (['light', 'dark'] as $theme) {
+            foreach ($accents as $i => $accent) {
+                $variants[] = [
+                    'key' => $theme.'-'.$i,
+                    'label' => $this->label($theme, $i, count($accents), $accent, $bright),
+                    'palette' => $this->build($theme, $dark, $bright, $accent),
+                ];
+            }
+        }
+
+        // Two clips can produce the same palette from different routes; there is
+        // no point offering the same swatches twice.
+        return array_values(collect($variants)
+            ->unique(fn ($v) => implode(',', $v['palette']))
+            ->all());
+    }
+
+    /**
+     * The single best palette — the first variant.
+     *
+     * @return array<string, string>|null
      */
     public function extract(string $videoPath): ?array
     {
+        return $this->variants($videoPath)[0]['palette'] ?? null;
+    }
+
+    private function label(string $theme, int $index, int $total, array $accent, array $bright): string
+    {
+        $page = $theme === 'light' ? 'Light page' : 'Dark page';
+
+        // The complement is always appended last.
+        if ($index === $total - 1) {
+            return $page.', complementary accent';
+        }
+
+        // An accent that is really just the footage's own bright tone reads as
+        // tone-on-tone rather than as a contrasting accent.
+        if (Color::distance($accent, $bright) <= self::DISTINCT) {
+            return $page.', tone on tone';
+        }
+
+        return $page.($index === 0 ? ', main accent' : ', alternate accent');
+    }
+
+    /**
+     * Assemble one complete palette.
+     *
+     * Each role is the footage's own hue at the lightness that role needs, then
+     * nudged only as far as contrast demands. ensureContrast picks its direction
+     * from the background, so the same calls work on a light or dark page.
+     *
+     * @param  array{0:int,1:int,2:int}  $dark
+     * @param  array{0:int,1:int,2:int}  $bright
+     * @param  array{0:int,1:int,2:int}  $accent
+     * @return array<string, string>
+     */
+    private function build(string $theme, array $dark, array $bright, array $accent): array
+    {
+        $l = self::LIGHTNESS[$theme];
+
+        // On a light page the background comes from the bright tone and the text
+        // from the dark one. On a dark page they swap.
+        [$pageSource, $textSource] = $theme === 'light' ? [$bright, $dark] : [$dark, $bright];
+
+        $paper = Color::withLightness($pageSource, $l['paper']);
+        $paperDeep = Color::withLightness($pageSource, $l['paper_deep']);
+
+        $ink = Color::ensureContrast(Color::withLightness($textSource, $l['ink']), $paper, self::CONTRAST_INK);
+        $inkSoft = Color::ensureContrast(Color::withLightness($textSource, $l['ink_soft']), $paper, self::CONTRAST_INK_SOFT);
+
+        $gold = Color::ensureContrast(Color::withLightness($accent, $l['gold']), $paper, self::CONTRAST_GOLD);
+        $goldDeep = Color::ensureContrast($gold, $paper, self::CONTRAST_GOLD_DEEP);
+
+        // The intro backdrop matches the clip's opening and carries the tap
+        // prompt in gold, so gold has to read against it.
+        $curtain = Color::ensureContrast(
+            Color::withLightness($dark, $l['curtain']),
+            $gold,
+            self::CONTRAST_GOLD
+        );
+
+        return [
+            'paper' => Color::toHex($paper),
+            'paper_deep' => Color::toHex($paperDeep),
+            'ink' => Color::toHex($ink),
+            'ink_soft' => Color::toHex($inkSoft),
+            'gold' => Color::toHex($gold),
+            'gold_deep' => Color::toHex($goldDeep),
+            'curtain' => Color::toHex($curtain),
+        ];
+    }
+
+    /**
+     * Accents worth offering, best first.
+     *
+     * Falls back to the bright tone when nothing in the footage is distinct
+     * enough — which is how a monochrome clip still yields a usable tone-on-tone
+     * palette instead of nothing.
+     *
+     * @param  array<int, array{rgb: array{0:int,1:int,2:int}, weight: float, chroma: float, lightness: float}>  $candidates
+     * @param  array{0:int,1:int,2:int}  $dark
+     * @param  array{0:int,1:int,2:int}  $bright
+     * @return array<int, array{0:int,1:int,2:int}>
+     */
+    private function accents(array $candidates, array $dark, array $bright): array
+    {
+        $floor = Color::chroma($bright) * self::ACCENT_CHROMA_FACTOR;
+
+        $distinct = collect($candidates)
+            ->filter(fn ($c) => Color::distance($c['rgb'], $dark) > self::DISTINCT
+                && Color::distance($c['rgb'], $bright) > self::DISTINCT
+                && $c['weight'] >= self::ACCENT_MIN_WEIGHT
+                && $c['chroma'] >= $floor)
+            ->sortByDesc(fn ($c) => $c['chroma'] * $c['weight'] ** 0.5)
+            ->pluck('rgb')
+            ->values();
+
+        // Drop near-duplicates so two variants are not offered for what is
+        // effectively the same colour.
+        $accents = [];
+
+        foreach ($distinct as $rgb) {
+            $tooClose = collect($accents)->contains(
+                fn ($kept) => Color::distance($kept, $rgb) <= self::DISTINCT
+            );
+
+            if (! $tooClose) {
+                $accents[] = $rgb;
+            }
+
+            if (count($accents) >= self::MAX_ACCENTS) {
+                break;
+            }
+        }
+
+        return $accents !== [] ? $accents : [$bright];
+    }
+
+    /**
+     * Sample the clip and quantise it into weighted colour candidates.
+     *
+     * @return array<int, array{rgb: array{0:int,1:int,2:int}, weight: float, chroma: float, lightness: float}>
+     */
+    private function candidates(string $videoPath): array
+    {
         if (! is_file($videoPath)) {
-            return null;
+            return [];
         }
 
         $frames = $this->sampleFrames($videoPath);
 
         if ($frames === []) {
-            return null;
+            return [];
         }
 
         $buckets = [];
@@ -85,7 +266,29 @@ class VideoPaletteExtractor
 
         @rmdir(dirname($frames[0]));
 
-        return $buckets === [] ? null : $this->derive($this->candidates($buckets));
+        if ($buckets === []) {
+            return [];
+        }
+
+        $total = array_sum(array_column($buckets, 'count'));
+        $candidates = [];
+
+        foreach ($buckets as $bucket) {
+            $rgb = [
+                (int) round($bucket['r'] / $bucket['count']),
+                (int) round($bucket['g'] / $bucket['count']),
+                (int) round($bucket['b'] / $bucket['count']),
+            ];
+
+            $candidates[] = [
+                'rgb' => $rgb,
+                'weight' => $bucket['count'] / $total,
+                'chroma' => Color::chroma($rgb),
+                'lightness' => Color::lightness($rgb),
+            ];
+        }
+
+        return $candidates;
     }
 
     /**
@@ -194,118 +397,5 @@ class VideoPaletteExtractor
         }
 
         imagedestroy($image);
-    }
-
-    /**
-     * @param  array<string, array{count:int, r:int, g:int, b:int}>  $buckets
-     * @return array<int, array{rgb: array{0:int,1:int,2:int}, weight: float, chroma: float, lightness: float}>
-     */
-    private function candidates(array $buckets): array
-    {
-        $total = array_sum(array_column($buckets, 'count'));
-        $candidates = [];
-
-        foreach ($buckets as $bucket) {
-            $rgb = [
-                (int) round($bucket['r'] / $bucket['count']),
-                (int) round($bucket['g'] / $bucket['count']),
-                (int) round($bucket['b'] / $bucket['count']),
-            ];
-
-            $candidates[] = [
-                'rgb' => $rgb,
-                'weight' => $bucket['count'] / $total,
-                'chroma' => Color::chroma($rgb),
-                'lightness' => Color::lightness($rgb),
-            ];
-        }
-
-        return $candidates;
-    }
-
-    /**
-     * Turn the anchors into the seven palette roles.
-     *
-     * @param  array<int, array{rgb: array{0:int,1:int,2:int}, weight: float, chroma: float, lightness: float}>  $candidates
-     * @return array<string, string>
-     */
-    private function derive(array $candidates): array
-    {
-        $best = fn (callable $score) => collect($candidates)
-            ->sortByDesc($score)
-            ->first()['rgb'];
-
-        // Weight against lightness, so these follow the footage rather than
-        // picking the single darkest or brightest stray cluster.
-        $dark = $best(fn ($c) => $c['weight'] * (1 - $c['lightness']));
-        $bright = $best(fn ($c) => $c['weight'] * $c['lightness']);
-        $accent = $this->accentSource($candidates, $dark, $bright);
-
-        // Each role is the footage's own hue at the lightness that role needs,
-        // then nudged only as far as contrast demands.
-        $paper = Color::withLightness($bright, self::L_PAPER);
-        $paperDeep = Color::withLightness($bright, self::L_PAPER_DEEP);
-
-        $ink = Color::ensureContrast(Color::withLightness($dark, self::L_INK), $paper, self::CONTRAST_INK);
-        $inkSoft = Color::ensureContrast(Color::withLightness($dark, self::L_INK_SOFT), $paper, self::CONTRAST_INK_SOFT);
-
-        $gold = Color::ensureContrast(Color::withLightness($accent, self::L_GOLD), $paper, self::CONTRAST_GOLD);
-        $goldDeep = Color::ensureContrast($gold, $paper, self::CONTRAST_GOLD_DEEP);
-
-        // The intro backdrop matches the clip's opening and carries the tap
-        // prompt in gold, so gold has to read against it.
-        $curtain = Color::ensureContrast(
-            Color::withLightness($dark, self::L_CURTAIN),
-            $gold,
-            self::CONTRAST_GOLD
-        );
-
-        return [
-            'paper' => Color::toHex($paper),
-            'paper_deep' => Color::toHex($paperDeep),
-            'ink' => Color::toHex($ink),
-            'ink_soft' => Color::toHex($inkSoft),
-            'gold' => Color::toHex($gold),
-            'gold_deep' => Color::toHex($goldDeep),
-            'curtain' => Color::toHex($curtain),
-        ];
-    }
-
-    /**
-     * The hue the accent should come from.
-     *
-     * Ranking purely on chroma finds the single most saturated cluster, which
-     * on warm footage means a stray coral rather than the champagne the clip is
-     * actually about. So a distinct colour has to earn it: far enough from both
-     * anchors, covering a real share of the frame, and clearly more colourful
-     * than the footage's own bright tone.
-     *
-     * Failing that, the accent is the bright tone itself — deepened later by
-     * the caller, which is exactly how ivory pages get gold accents.
-     *
-     * @param  array<int, array{rgb: array{0:int,1:int,2:int}, weight: float, chroma: float, lightness: float}>  $candidates
-     * @param  array{0:int,1:int,2:int}  $dark
-     * @param  array{0:int,1:int,2:int}  $bright
-     * @return array{0:int,1:int,2:int}
-     */
-    private function accentSource(array $candidates, array $dark, array $bright): array
-    {
-        $floor = Color::chroma($bright) * self::ACCENT_CHROMA_FACTOR;
-
-        $distinct = array_values(array_filter(
-            $candidates,
-            fn ($c) => Color::distance($c['rgb'], $dark) > self::DISTINCT
-                && Color::distance($c['rgb'], $bright) > self::DISTINCT
-                && $c['weight'] >= self::ACCENT_MIN_WEIGHT
-                && $c['chroma'] >= $floor
-        ));
-
-        if ($distinct === []) {
-            return $bright;
-        }
-
-        return collect($distinct)
-            ->sortByDesc(fn ($c) => $c['chroma'] * $c['weight'] ** 0.5)
-            ->first()['rgb'];
     }
 }

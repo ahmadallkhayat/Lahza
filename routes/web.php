@@ -3,7 +3,9 @@
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\InvitationController as AdminInvitationController;
 use App\Http\Controllers\Admin\LoginController;
+use App\Http\Controllers\Admin\PaletteController;
 use App\Http\Controllers\Admin\TemplateController;
+use App\Http\Controllers\Admin\TemplatePreviewController;
 use App\Http\Controllers\Admin\TranslateController;
 use App\Http\Controllers\InvitationController;
 use Illuminate\Support\Facades\Route;
@@ -53,6 +55,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('logout', [LoginController::class, 'destroy'])->name('logout');
 
         Route::get('/', DashboardController::class)->name('dashboard');
+
+        // Before the resource routes so the literal segment is not read as a
+        // {template} id. Throttled because each call runs ffmpeg.
+        Route::post('templates/palettes', PaletteController::class)
+            ->middleware('throttle:20,1')
+            ->name('templates.palettes');
+
+        // Renders the invitation from unsaved form values, for the live frame.
+        Route::post('templates/preview', TemplatePreviewController::class)
+            ->name('templates.preview');
 
         Route::resource('templates', TemplateController::class)->except('show');
 

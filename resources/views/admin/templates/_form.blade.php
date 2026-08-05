@@ -2,16 +2,7 @@
     $palette = old('palette', $template->palette());
     $settings = old('settings', $template->settings());
 
-    $paletteLabels = [
-        'paper' => 'Page background',
-        'paper_deep' => 'Panel fill',
-        'ink' => 'Primary text',
-        'ink_soft' => 'Secondary text',
-        'gold' => 'Accent',
-        'gold_deep' => 'Accent (text safe)',
-        'curtain' => 'Intro backdrop',
-    ];
-
+    // Colour roles live in _colours.blade.php, alongside the picker.
     $settingLabels = [
         'keepVideoAudioMs' => ['Keep video audio', 'ms before muting the clip. 0 keeps it silent throughout.'],
         'musicFadeMs' => ['Music fade in', 'ms for the music to reach full volume.'],
@@ -70,10 +61,50 @@
         <x-ui.field
             label="Intro video"
             name="intro_video"
-            :hint="'MP4, WebM or MOV, up to '.round(config('templates.max_video_kb') / 1000).'MB.'"
+            :hint="'MP4, WebM or MOV, up to '.round(config('templates.max_video_kb') / 1000).'MB. Colours are generated from it below.'"
         >
             @if ($template->intro_video)
-                <video src="{{ $template->intro_video }}" class="mb-2 h-36 rounded-lg border border-ink-200" controls muted></video>
+                {{-- No `controls`: the native player chrome — scrub bar, volume,
+                     fullscreen, download menu — is noise on a thumbnail. Click
+                     the frame to play or pause it. --}}
+                <div
+                    class="mb-2 w-fit"
+                    x-data="{ playing: false }"
+                >
+                    <button
+                        type="button"
+                        class="relative block overflow-hidden rounded-lg border border-ink-200 bg-ink-900"
+                        x-on:click="playing = ! playing; playing ? $refs.preview.play() : $refs.preview.pause()"
+                        :aria-label="playing ? 'Pause preview' : 'Play preview'"
+                    >
+                        <video
+                            x-ref="preview"
+                            src="{{ $template->intro_video }}"
+                            class="block h-36 w-auto"
+                            muted
+                            loop
+                            playsinline
+                            preload="metadata"
+                            x-on:ended="playing = false"
+                        ></video>
+
+                        <span
+                            x-show="! playing"
+                            class="pointer-events-none absolute inset-0 grid place-items-center bg-ink-900/25"
+                        >
+                            <span class="grid h-9 w-9 place-items-center rounded-full bg-white/85">
+                                <x-heroicon-s-play class="h-4 w-4 translate-x-px text-ink-800" />
+                            </span>
+                        </span>
+                    </button>
+
+                    <p class="mt-1 text-xs text-ink-400">Silent preview — click to play.</p>
+                </div>
+
+                <label class="mb-2 flex items-center gap-2 text-xs text-ink-600">
+                    <input type="checkbox" name="remove_video" value="1" class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
+                    Remove current video
+                </label>
             @endif
             <input
                 type="file"
@@ -107,47 +138,7 @@
     </div>
 </x-ui.card>
 
-<x-ui.card title="Colours" description="Emitted as CSS custom properties the design reads.">
-    <label class="mb-5 flex items-start gap-2.5 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-ink-700">
-        <input
-            type="checkbox"
-            name="derive_palette"
-            value="1"
-            class="mt-0.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"
-        >
-        <span>
-            Read colours from the intro video
-            <span class="mt-0.5 block text-xs text-ink-500">
-                Samples frames from the clip and derives all seven roles, keeping each one legible.
-                Overwrites the values below. Leave unchecked to keep them as they are.
-            </span>
-        </span>
-    </label>
-
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        @foreach ($paletteLabels as $key => $label)
-            <x-ui.field :label="$label" :name="'palette.'.$key" :for="'palette_'.$key">
-                <div class="flex items-center gap-2">
-                    <input
-                        type="color"
-                        id="palette_{{ $key }}"
-                        name="palette[{{ $key }}]"
-                        value="{{ $palette[$key] ?? \App\Models\Template::DEFAULT_PALETTE[$key] }}"
-                        class="h-9 w-12 shrink-0 cursor-pointer rounded border border-ink-300 bg-white p-0.5"
-                        oninput="this.nextElementSibling.value = this.value"
-                    >
-                    <input
-                        type="text"
-                        value="{{ $palette[$key] ?? \App\Models\Template::DEFAULT_PALETTE[$key] }}"
-                        class="block w-full rounded-lg border-ink-300 font-mono text-xs text-ink-700 shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                        oninput="this.previousElementSibling.value = this.value"
-                        aria-label="{{ $label }} hex value"
-                    >
-                </div>
-            </x-ui.field>
-        @endforeach
-    </div>
-</x-ui.card>
+@include('admin.templates._colours')
 
 <x-ui.card title="Reveal timings" description="How the intro hands over to the invitation.">
     <div class="grid gap-5 sm:grid-cols-2">
