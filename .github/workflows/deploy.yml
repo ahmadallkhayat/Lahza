@@ -1,0 +1,52 @@
+name: Deploy to production
+
+# Runs on every push to master, which includes merges of pull requests.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Never let two deploys touch the server at once; queue them instead.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to lahza-invites.click
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      # The server key is command-restricted: this connection can only ever run
+      # /usr/local/bin/lahza-deploy, whatever is sent here.
+      - name: Run deploy on server
+        run: |
+          ssh -o BatchMode=yes -o ConnectTimeout=20 \
+            -i ~/.ssh/id_ed25519 \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            deploy
+
+      - name: Verify site is up
+        run: |
+          for i in 1 2 3 4 5; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 https://lahza-invites.click/ || echo 000)
+            echo "attempt $i: HTTP $code"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 5
+          done
+          echo "Site did not return HTTP 200 after deploy"
+          exit 1
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
