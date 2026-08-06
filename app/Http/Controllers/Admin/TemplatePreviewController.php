@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 /**
@@ -25,7 +26,13 @@ class TemplatePreviewController extends Controller
 {
     public function __invoke(Request $request): Response
     {
-        $data = $request->validate([
+        // Validated by hand rather than with $request->validate(), which
+        // answers a failure with a 302 back to the form unless the caller
+        // asked for JSON. fetch() follows that redirect and hands back the
+        // admin page with status 200 — which the preview then rendered inside
+        // its own frame, showing the studio a copy of the page it was already
+        // looking at. A failure here must always be a status, never a redirect.
+        $validator = Validator::make($request->all(), [
             'base_template' => ['required', Rule::in(array_keys(BaseTemplates::available()))],
             'palette' => ['array'],
             'palette.*' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
@@ -42,6 +49,17 @@ class TemplatePreviewController extends Controller
 
             'locale' => ['nullable', Rule::in(array_keys(config('templates.locales')))],
         ]);
+
+        if ($validator->fails()) {
+            return response(
+                $validator->errors()->has('base_template')
+                    ? 'Choose a base template to preview.'
+                    : 'Those values cannot be previewed.',
+                422
+            )->header('Cache-Control', 'no-store');
+        }
+
+        $data = $validator->validated();
 
         $template = $this->transientTemplate($data);
         $invitation = $this->sampleInvitation($template, $data['locale'] ?? 'ar');

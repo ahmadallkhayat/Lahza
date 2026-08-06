@@ -26,6 +26,48 @@ class TemplatePreviewTest extends TestCase
         return array_merge(['base_template' => 'luxury-wedding-v1'], $overrides);
     }
 
+    /**
+     * Regression: validation used to fail with a 302 back to the form, which
+     * fetch() follows. The preview then received the admin page at status 200
+     * and rendered it into its own frame — the studio saw a copy of the page
+     * it was standing on. A failure must be a status the caller can detect.
+     */
+    public function test_a_missing_base_template_is_a_422_not_a_redirect(): void
+    {
+        $response = $this->post('/admin/templates/preview', ['locale' => 'ar']);
+
+        $response->assertStatus(422);
+
+        $this->assertFalse(
+            $response->isRedirect(),
+            'A failed preview must not redirect — fetch follows it and renders the destination.'
+        );
+    }
+
+    /** Even without the JSON headers a browser sends on a normal form post. */
+    public function test_it_does_not_redirect_even_when_json_is_not_requested(): void
+    {
+        $this->post('/admin/templates/preview', [], ['Accept' => 'text/html'])
+            ->assertStatus(422);
+    }
+
+    public function test_the_failure_says_what_to_do(): void
+    {
+        $this->post('/admin/templates/preview', [])
+            ->assertStatus(422)
+            ->assertSee('Choose a base template to preview.', false);
+    }
+
+    /** The frame must never be handed an admin page to render. */
+    public function test_a_failed_preview_returns_no_admin_markup(): void
+    {
+        $body = $this->post('/admin/templates/preview', [])->getContent();
+
+        $this->assertStringNotContainsString('<html', $body);
+        $this->assertStringNotContainsString('New template', $body);
+        $this->assertStringNotContainsString('csrf-token', $body);
+    }
+
     public function test_it_renders_the_real_base_template(): void
     {
         // Not a mock-up: the same markup and JavaScript a guest gets, so the
@@ -143,22 +185,30 @@ class TemplatePreviewTest extends TestCase
             'data:text/html,<script>alert(1)</script>',
             '//evil.example/clip.mp4',
         ] as $refused) {
-            $this->post('/admin/templates/preview', $this->payload(['intro_video' => $refused]))
-                ->assertSessionHasErrors('intro_video');
+            // 422 rather than session errors: the endpoint answers fetch(), so
+            // a refusal is a status. Asserting the value never reaches the body
+            // is the part that actually matters here.
+            $response = $this->post('/admin/templates/preview', $this->payload(['intro_video' => $refused]));
+
+            $response->assertStatus(422);
+            $this->assertStringNotContainsString($refused, $response->getContent());
         }
     }
 
     public function test_it_refuses_a_base_template_that_does_not_exist(): void
     {
         $this->post('/admin/templates/preview', ['base_template' => 'no-such-design'])
-            ->assertSessionHasErrors('base_template');
+            ->assertStatus(422);
     }
 
     public function test_it_refuses_a_bad_colour(): void
     {
-        $this->post('/admin/templates/preview', $this->payload([
+        $response = $this->post('/admin/templates/preview', $this->payload([
             'palette' => ['paper' => 'url(javascript:alert(1))'],
-        ]))->assertSessionHasErrors('palette.paper');
+        ]));
+
+        $response->assertStatus(422);
+        $this->assertStringNotContainsString('javascript:alert(1)', $response->getContent());
     }
 
     public function test_the_preview_is_never_cached_or_indexed(): void

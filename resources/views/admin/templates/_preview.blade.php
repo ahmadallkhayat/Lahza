@@ -94,18 +94,38 @@
         async render() {
             if (this.loading) return;
 
+            // On the create form nothing is chosen yet, so there is nothing to
+            // preview. Say so instead of posting a request that can only fail.
+            const form = this.$root.closest('form');
+            if (! form?.elements?.base_template?.value) {
+                this.$refs.frame.srcdoc = '';
+                this.stale = false;
+                this.error = 'Choose a base template to preview.';
+                return;
+            }
+
             this.loading = true;
             this.error = '';
 
             try {
                 const response = await fetch(@js(route('admin.templates.preview')), {
                     method: 'POST',
+                    // Without this Laravel answers a validation failure with a
+                    // redirect back to the form, which fetch follows — handing
+                    // back the admin page at status 200. Asking for JSON keeps
+                    // a failure a failure.
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    // Belt and braces: never render whatever a redirect lands on.
+                    redirect: 'error',
                     body: this.formValues(),
                 });
 
-                if (! response.ok) {
+                if (! response.ok || response.redirected) {
                     this.error = response.status === 422
-                        ? 'Choose a base template to preview.'
+                        ? (await response.text()) || 'Choose a base template to preview.'
                         : 'The preview could not be rendered.';
                     return;
                 }

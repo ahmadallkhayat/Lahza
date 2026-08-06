@@ -443,6 +443,10 @@ footer {
 </head>
 <body>
 
+{{-- Marks an unpublished preview. Every base template should include this,
+     or a draft looks identical to a live invitation. --}}
+@include('public._draft-notice')
+
 <div id="curtain">
     @if ($template->intro_video)
         <video id="intro" playsinline preload="auto" muted src="{{ $template->intro_video }}"></video>
