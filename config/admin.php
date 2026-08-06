@@ -44,6 +44,17 @@ return [
                 ],
             ],
         ],
+        [
+            'heading' => 'Settings',
+            'items' => [
+                [
+                    'label' => 'Account',
+                    'route' => 'admin.account.edit',
+                    'icon' => 'user-circle',
+                    'active' => 'admin.account.*',
+                ],
+            ],
+        ],
     ],
 
 ];

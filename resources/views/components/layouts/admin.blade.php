@@ -60,7 +60,12 @@
 
     {{-- Account block, pinned to the bottom --}}
     <div class="shrink-0 border-t border-ink-200 p-3">
-        <div class="flex items-center gap-3 px-1 pb-3">
+        {{-- The identity block doubles as the way into account settings, which
+             is where people look for it before they scan the nav. --}}
+        <a
+            href="{{ route('admin.account.edit') }}"
+            class="mb-1 flex items-center gap-3 rounded-lg px-1 py-2 transition-colors hover:bg-ink-100"
+        >
             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-100 text-xs font-semibold text-ink-600">
                 {{ Str::upper(Str::substr(auth()->user()->name, 0, 1)) }}
             </span>
@@ -70,7 +75,7 @@
                      string so Blade never sees a bare @ to interpret. --}}
                 <p class="truncate text-xs text-ink-500">{{ '@'.auth()->user()->username }}</p>
             </div>
-        </div>
+        </a>
 
         <form method="POST" action="{{ route('admin.logout') }}">
             @csrf

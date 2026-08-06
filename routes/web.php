@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\InvitationController as AdminInvitationController;
 use App\Http\Controllers\Admin\LoginController;
@@ -77,5 +78,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('translate', TranslateController::class)
             ->middleware('throttle:20,1')
             ->name('translate');
+
+        // The signed-in account's own settings. No {user} segment by design —
+        // there is one account, and it is always the authenticated one.
+        Route::get('account', [AccountController::class, 'edit'])->name('account.edit');
+        Route::put('account', [AccountController::class, 'update'])->name('account.update');
+        Route::put('account/password', [AccountController::class, 'updatePassword'])
+            ->middleware('throttle:10,1')
+            ->name('account.password');
     });
 });
