@@ -1,0 +1,25 @@
+# System packages required in production.
+#
+# The deploy checks each of these and apt-installs any that are missing before
+# building the release, so adding a dependency here is all that is needed to
+# get it onto the server on the next push to master.
+#
+# One package per line. Blank lines and # comments are ignored.
+
+# --- PHP runtime and the extensions Laravel needs -------------------------
+php8.5-fpm
+php8.5-cli
+php8.5-mysql
+php8.5-mbstring
+php8.5-xml
+php8.5-curl
+php8.5-zip
+php8.5-bcmath
+php8.5-gd
+php8.5-intl
+
+# --- Media -----------------------------------------------------------------
+# VideoPaletteExtractor samples frames with ffmpeg and reads duration with
+# ffprobe. Without these, palette extraction silently falls back to the
+# colours typed into the form. See config/templates.php.
+ffmpeg
