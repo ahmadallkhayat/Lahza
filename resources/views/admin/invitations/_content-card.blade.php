@@ -6,8 +6,9 @@
 
      The programme is row-aligned across languages: it is the same sequence of
      events described in each language, so a row is one moment of the evening
-     with a time and title per language. Times repeat per language because the
-     digits differ (٧:٠٠ vs 7:00). --}}
+     with a time and title per language. Times are still stored per language
+     because the digits differ (٧:٠٠ vs 7:00), but they are no longer typed
+     per language — one picker per row writes all of them. --}}
 
 @php
     $locales = config('templates.locales');
@@ -129,34 +130,86 @@
             <template x-for="(step, i) in steps" :key="i">
                 <div class="rounded-lg border border-ink-200 bg-ink-50 p-3">
                     <div class="flex items-start gap-3">
-                        <div
-                            class="grid flex-1 gap-3"
-                            :style="`grid-template-columns: repeat(${locales.length}, minmax(0, 1fr))`"
-                        >
-                            @foreach ($locales as $code => $meta)
-                                <div x-show="has('{{ $code }}')" x-cloak>
-                                    <p class="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-ink-400">
-                                        {{ $meta['label'] }}
-                                    </p>
-                                    <div class="flex gap-2" @if ($meta['rtl']) dir="rtl" @endif>
-                                        <input
-                                            type="text"
-                                            :name="`programme[{{ $code }}][${i}][time]`"
-                                            x-model="step['{{ $code }}'].time"
-                                            placeholder="{{ $meta['numerals'] === 'arab' ? '٧:٠٠' : '7:00' }}"
-                                            class="w-20 shrink-0 rounded-lg border-ink-300 bg-white text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                            aria-label="Time"
+                        <div class="min-w-0 flex-1">
+
+                            {{-- One picker for the row. The same moment in every
+                                 language, so it is chosen once and written into
+                                 each — rather than typed three times, in two
+                                 different numeral systems. --}}
+                            <div class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                                <div class="flex items-center gap-2">
+                                    <label
+                                        class="text-[0.65rem] font-semibold uppercase tracking-wider text-ink-400"
+                                        :for="`step-time-${i}`"
+                                    >Time</label>
+                                    <input
+                                        type="time"
+                                        :id="`step-time-${i}`"
+                                        step="300"
+                                        x-init="$el.value = pickerValue(step)"
+                                        x-on:input="setStepTime(i, $event.target.value)"
+                                        class="rounded-lg border-ink-300 bg-white text-sm tabular-nums shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                                    >
+                                </div>
+
+                                {{-- What each language will actually show. Without
+                                     this the Arabic-Indic result is invisible until
+                                     the invitation is opened. --}}
+                                <div class="flex flex-wrap items-center gap-2">
+                                    @foreach ($locales as $code => $meta)
+                                        <span
+                                            x-show="has('{{ $code }}') && step['{{ $code }}'].time"
+                                            x-cloak
+                                            class="inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-xs text-ink-600 ring-1 ring-inset ring-ink-200"
                                         >
+                                            <span class="text-[0.6rem] uppercase tracking-wider text-ink-400">{{ $code }}</span>
+                                            <span @if ($meta['rtl']) dir="rtl" @endif x-text="step['{{ $code }}'].time"></span>
+                                        </span>
+                                    @endforeach
+
+                                    <span
+                                        x-show="! step[def]?.time"
+                                        x-cloak
+                                        class="text-xs text-ink-400"
+                                    >No time set</span>
+                                </div>
+                            </div>
+
+                            {{-- The value each language submits. Hidden because the
+                                 picker owns it — but still posted under the same
+                                 names, so nothing about the stored shape changes.
+                                 An existing value the picker cannot parse is left
+                                 exactly as it was rather than being wiped. --}}
+                            @foreach ($locales as $code => $meta)
+                                <template x-if="has('{{ $code }}')">
+                                    <input
+                                        type="hidden"
+                                        :name="`programme[{{ $code }}][${i}][time]`"
+                                        :value="step['{{ $code }}'].time"
+                                    >
+                                </template>
+                            @endforeach
+
+                            <div
+                                class="grid gap-3"
+                                :style="`grid-template-columns: repeat(${locales.length}, minmax(0, 1fr))`"
+                            >
+                                @foreach ($locales as $code => $meta)
+                                    <div x-show="has('{{ $code }}')" x-cloak>
+                                        <p class="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-ink-400">
+                                            {{ $meta['label'] }}
+                                        </p>
                                         <input
                                             type="text"
                                             :name="`programme[{{ $code }}][${i}][title]`"
                                             x-model="step['{{ $code }}'].title"
+                                            @if ($meta['rtl']) dir="rtl" @endif
                                             class="w-full rounded-lg border-ink-300 bg-white text-sm shadow-sm focus:border-brand-500 focus:ring-brand-500"
                                             aria-label="What happens"
                                         >
                                     </div>
-                                </div>
-                            @endforeach
+                                @endforeach
+                            </div>
                         </div>
 
                         <button

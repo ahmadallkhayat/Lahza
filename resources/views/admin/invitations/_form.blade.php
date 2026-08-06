@@ -94,6 +94,60 @@
             return String(value).replace(/[0-9]/g, d => arab[d]);
         },
 
+        /* ── Programme times ──────────────────────────────────────────
+           Stored per language as a display string, because the digits
+           differ (٧:٠٠ vs 7:00). The picker holds one real time for the
+           row and writes the right string into every language, so the
+           same time is never typed three times in two numeral systems. */
+
+        /** 24h "19:00" from the picker -> "7:00", the studio's convention. */
+        to12h(value) {
+            const [h, m] = String(value).split(':').map(Number);
+            if (Number.isNaN(h) || Number.isNaN(m)) return '';
+
+            const hour = h % 12 === 0 ? 12 : h % 12;
+
+            return hour + ':' + String(m).padStart(2, '0');
+        },
+
+        /**
+         * Best-effort read of a stored string back into "HH:MM" for the
+         * picker. Arabic-Indic digits are folded to Latin first.
+         *
+         * 12-hour strings carry no meridiem, so "7:00" is genuinely
+         * ambiguous. Evening is assumed for anything from 1 to 11, which is
+         * when these events run — and the picker shows what it chose, so a
+         * wrong guess is visible and one click to fix rather than silent.
+         */
+        pickerValue(step) {
+            const raw = String(step[this.def]?.time ?? step[this.locales[0]]?.time ?? '').trim();
+            if (! raw) return '';
+
+            const latin = raw.replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+            const match = latin.match(/^(\d{1,2}):(\d{2})$/);
+            if (! match) return '';
+
+            let hour = Number(match[1]);
+            const minute = Number(match[2]);
+            if (hour > 23 || minute > 59) return '';
+
+            if (hour >= 1 && hour <= 11) hour += 12;
+
+            return String(hour).padStart(2, '0') + ':' + match[2];
+        },
+
+        /** Write one picked time into every language on that row. */
+        setStepTime(i, value) {
+            const step = this.steps[i];
+            if (! step) return;
+
+            const display = value ? this.to12h(value) : '';
+
+            Object.keys(this.labels).forEach(code => {
+                if (step[code]) step[code].time = this.localiseDigits(display, code);
+            });
+        },
+
         async translateFromEnglish() {
             if (this.translating) return;
 
