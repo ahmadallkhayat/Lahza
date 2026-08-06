@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\InvitationRequest;
+use App\Models\Asset;
 use App\Models\Invitation;
 use App\Models\Template;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -29,6 +31,7 @@ class InvitationController extends Controller
                 'default_locale' => 'ar',
             ]),
             'templates' => $this->selectableTemplates(),
+            'textAssets' => $this->textAssets(),
         ]);
     }
 
@@ -48,6 +51,7 @@ class InvitationController extends Controller
         return view('admin.invitations.edit', [
             'invitation' => $invitation,
             'templates' => $this->selectableTemplates($invitation->template_id),
+            'textAssets' => $this->textAssets(),
         ]);
     }
 
@@ -87,6 +91,27 @@ class InvitationController extends Controller
         return Template::query()
             ->where(fn ($q) => $q->where('is_active', true)->when($keepId, fn ($q2) => $q2->orWhere('id', $keepId)))
             ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Ready-written blocks the studio can drop into the content fields —
+     * verses, hosting lines, and anything else worth keeping.
+     *
+     * Not scoped to the chosen template's base template, unlike the media
+     * library: the template can be changed in this same form, and a blessing
+     * is not specific to a design anyway. The option list names the design each
+     * block belongs to instead.
+     *
+     * @return Collection<int, Asset>
+     */
+    private function textAssets()
+    {
+        return Asset::query()
+            ->active()
+            ->ofKind(Asset::KIND_TEXT)
+            ->whereNotNull('body')
+            ->ordered()
             ->get();
     }
 

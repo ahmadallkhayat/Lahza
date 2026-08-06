@@ -37,6 +37,12 @@ return [
                     'active' => 'admin.templates.*',
                 ],
                 [
+                    'label' => 'Assets',
+                    'route' => 'admin.assets.index',
+                    'icon' => 'rectangle-stack',
+                    'active' => 'admin.assets.*',
+                ],
+                [
                     'label' => 'Invitations',
                     'route' => 'admin.invitations.index',
                     'icon' => 'envelope-open',

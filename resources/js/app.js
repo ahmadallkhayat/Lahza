@@ -1,5 +1,6 @@
 import Alpine from 'alpinejs';
 
+import assetForm from './admin/asset-form';
 import copyButton from './admin/copy-button';
 import invitationForm from './admin/invitation-form';
 import palettePicker from './admin/palette-picker';
@@ -14,6 +15,7 @@ import templatePreview from './admin/template-preview';
 //
 // Blade passes server values as a single escaped object:
 //     x-data="invitationForm(@js([...]))"
+Alpine.data('assetForm', assetForm);
 Alpine.data('copyButton', copyButton);
 Alpine.data('invitationForm', invitationForm);
 Alpine.data('palettePicker', palettePicker);

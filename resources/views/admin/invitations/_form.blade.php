@@ -41,6 +41,27 @@
 
     $labels = collect($localeMeta)->map(fn ($m) => $m['label'])->all();
     $numerals = collect($localeMeta)->map(fn ($m) => $m['numerals'])->all();
+
+    // Ready-written blocks from the library, flattened to what the browser
+    // needs to insert one and fill in its placeholders.
+    $assetOptions = $textAssets
+        ->map(fn ($asset) => [
+            'id' => $asset->id,
+            'name' => $asset->name,
+            'body' => (string) $asset->body,
+            'locale' => $asset->locale,
+            'field' => $asset->field,
+        ])
+        ->values()
+        ->all();
+
+    // The meridiem word each language shows, so {time} resolves out here to
+    // exactly what the invitation itself renders. ICU's own marker is a terse
+    // "م", which is why these live in lang files rather than coming from Intl.
+    $meridiem = [
+        'am' => collect($codes)->mapWithKeys(fn ($c) => [$c => trans('invitation.am', [], $c)])->all(),
+        'pm' => collect($codes)->mapWithKeys(fn ($c) => [$c => trans('invitation.pm', [], $c)])->all(),
+    ];
 @endphp
 
 <div
@@ -54,6 +75,11 @@
         'text' => $text,
         'steps' => $steps,
         'translateUrl' => route('admin.translate'),
+        'assets' => $assetOptions,
+        'placeholders' => \App\Support\Placeholders::aliases(),
+        'meridiem' => $meridiem,
+        'picked' => array_fill_keys($translatable, ''),
+        'notes' => array_fill_keys($translatable, ''),
     ]))"
 >
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AccountController;
+use App\Http\Controllers\Admin\AssetController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\InvitationController as AdminInvitationController;
 use App\Http\Controllers\Admin\LoginController;
@@ -68,6 +69,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->name('templates.preview');
 
         Route::resource('templates', TemplateController::class)->except('show');
+
+        // The reusable library — clips, music and ready-written text — that
+        // templates and invitations pick from.
+        Route::resource('assets', AssetController::class)->except('show');
 
         Route::resource('invitations', AdminInvitationController::class)->except('show');
         Route::patch('invitations/{invitation}/publish', [AdminInvitationController::class, 'togglePublish'])

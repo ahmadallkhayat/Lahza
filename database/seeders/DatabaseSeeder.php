@@ -25,5 +25,9 @@ class DatabaseSeeder extends Seeder
         );
 
         $this->call(LuxuryWeddingV1Seeder::class);
+
+        // After the template: it registers that template's own media as assets,
+        // so it has to run once the media is on disk.
+        $this->call(AssetLibrarySeeder::class);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\Asset;
 use App\Models\Invitation;
 use App\Models\Template;
 use App\Models\User;
@@ -62,15 +63,21 @@ class InlineScriptIntegrityTest extends TestCase
     {
         $invitation = Invitation::factory()->create();
         $template = Template::factory()->create();
+        $text = Asset::factory()->create();
+        $video = Asset::factory()->video()->create();
 
         return [
             '/admin',
             '/admin/invitations',
             '/admin/templates',
+            '/admin/assets',
             '/admin/invitations/create',
             "/admin/invitations/{$invitation->slug}/edit",
             '/admin/templates/create',
             "/admin/templates/{$template->id}/edit",
+            '/admin/assets/create',
+            "/admin/assets/{$text->id}/edit",
+            "/admin/assets/{$video->id}/edit",
             '/admin/account',
         ];
     }
@@ -115,6 +122,16 @@ class InlineScriptIntegrityTest extends TestCase
         $this->get('/admin/templates/create')
             ->assertOk()
             ->assertSee('templatePreview(', false);
+
+        $asset = Asset::factory()->create();
+
+        $this->get('/admin/assets/create')
+            ->assertOk()
+            ->assertSee('assetForm(', false);
+
+        $this->get("/admin/assets/{$asset->id}/edit")
+            ->assertOk()
+            ->assertSee('assetForm(', false);
     }
 
     /**
