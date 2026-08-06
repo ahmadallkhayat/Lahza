@@ -65,6 +65,66 @@
                     <p class="mb-2 text-xs text-ink-500">The families extending the invitation.</p>
                 @endif
 
+                {{-- Ready-written text from the library. Placeholders are filled
+                     in as it is inserted, so what lands in the box is ordinary
+                     editable text rather than tokens waiting to be resolved.
+
+                     A block written in one language goes into that language's
+                     column; one with no language goes into the default. Which
+                     column it landed in is said out loud — with three columns
+                     side by side, guessing is not good enough. --}}
+                @if ($textAssets->isNotEmpty())
+                    @php
+                        $suits = $textAssets->filter(fn ($a) => $a->field === $field || blank($a->field));
+                        $others = $textAssets->reject(fn ($a) => $a->field === $field || blank($a->field));
+                    @endphp
+
+                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                        <select
+                            x-model="picked.{{ $field }}"
+                            aria-label="Premade text for {{ $label }}"
+                            class="max-w-xs rounded-lg border-ink-300 bg-white text-xs text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                        >
+                            <option value="">Insert premade text…</option>
+
+                            @if ($suits->isNotEmpty())
+                                <optgroup label="Suits this field">
+                                    @foreach ($suits as $asset)
+                                        <option value="{{ $asset->id }}">
+                                            {{ $asset->name }}{{ $asset->localeLabel() ? ' — '.$asset->localeLabel() : '' }}
+                                        </option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
+
+                            @if ($others->isNotEmpty())
+                                <optgroup label="Other text">
+                                    @foreach ($others as $asset)
+                                        <option value="{{ $asset->id }}">
+                                            {{ $asset->name }}{{ $asset->localeLabel() ? ' — '.$asset->localeLabel() : '' }}
+                                        </option>
+                                    @endforeach
+                                </optgroup>
+                            @endif
+                        </select>
+
+                        <x-ui.button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            x-bind:disabled="! picked.{{ $field }}"
+                            x-on:click="insertAsset('{{ $field }}')"
+                        >Insert</x-ui.button>
+
+                        <span
+                            x-show="assetNote.{{ $field }}"
+                            x-cloak
+                            class="text-xs text-ok-700"
+                            x-text="assetNote.{{ $field }}"
+                        ></span>
+                    </div>
+                @endif
+
                 <div
                     class="grid gap-3"
                     :style="`grid-template-columns: repeat(${locales.length}, minmax(0, 1fr))`"

@@ -20,6 +20,17 @@ export default function invitationForm(config) {
         text: config.text,
         steps: config.steps,
 
+        // Ready-written blocks from the asset library, the placeholder
+        // spellings they may use, and the meridiem words each language shows —
+        // all so a {date} or {bride} can be filled in out here exactly as the
+        // invitation itself would render it.
+        assets: config.assets,
+        placeholders: config.placeholders,
+        meridiem: config.meridiem,
+
+        picked: config.picked,
+        assetNote: config.notes,
+
         reviewed: {},
         translating: false,
         translateNote: '',
@@ -112,6 +123,156 @@ export default function invitationForm(config) {
             Object.keys(this.labels).forEach(code => {
                 if (step[code]) step[code].time = this.localiseDigits(display, code);
             });
+        },
+
+        /* ── Premade text ─────────────────────────────────────────────
+           Placeholders are filled in at the moment a block is inserted,
+           not kept as tokens in the database. Two reasons: what lands in
+           the field is ordinary text the studio can then edit, and the
+           guest page needs to know nothing about any of this — the
+           invitation stores the same shape it always did.
+
+           The trade is that changing a name later does not rewrite text
+           already inserted. That is the right way round: the text is
+           usually reworded by hand afterwards anyway, and silently
+           rewriting a customer's copy would be worse. */
+
+        /**
+         * Read a plain form input by name.
+         *
+         * form.elements rather than a CSS attribute selector — such a selector
+         * needs quoting, and quotes are what this whole file exists to avoid
+         * having in an attribute.
+         */
+        formField(name) {
+            return this.$root.closest('form')?.elements?.[name]?.value ?? '';
+        },
+
+        /** Sorani Kurdish is ckb to Intl, not ku — as it is to ICU. */
+        icuLocale(code) {
+            return code === 'ku' ? 'ckb' : code;
+        },
+
+        /** What each placeholder resolves to, in one language. */
+        placeholderValues(code) {
+            // Names are Arabic in every language. English is the one place the
+            // Latin form reads better, and only when it is filled in.
+            const latin = code === 'en';
+            const groomLatin = this.formField('groom_latin');
+            const brideLatin = this.formField('bride_latin');
+
+            return {
+                groom: latin && groomLatin ? groomLatin : this.formField('groom_ar'),
+                bride: latin && brideLatin ? brideLatin : this.formField('bride_ar'),
+                venue: this.text.venue_name?.[code] || '',
+                city: this.text.venue_city?.[code] || '',
+                date: this.formattedDate(code),
+                time: this.formattedTime(code),
+            };
+        },
+
+        /** Mirrors Invitation::formattedDate() — same shape, in the browser. */
+        formattedDate(code) {
+            const raw = this.formField('date');
+            if (! raw) return '';
+
+            const [y, m, d] = raw.split('-').map(Number);
+            if (! y || ! m || ! d) return '';
+
+            // Midday UTC and an explicit UTC timeZone: building at midnight
+            // and formatting in a western zone lands on the previous day and
+            // would show the wrong weekday.
+            const at = new Date(Date.UTC(y, m - 1, d, 12));
+
+            try {
+                // Latin digits from Intl, then localiseDigits — the same split
+                // the server makes, so both produce the same numerals.
+                const formatted = new Intl.DateTimeFormat(this.icuLocale(code) + '-u-nu-latn', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                    timeZone: 'UTC',
+                }).format(at);
+
+                return this.localiseDigits(formatted, code);
+            } catch (e) {
+                return raw;
+            }
+        },
+
+        /** Mirrors Invitation::formattedTime(), meridiem words and all. */
+        formattedTime(code) {
+            const raw = this.formField('time');
+            if (! raw) return '';
+
+            const hour = Number(String(raw).split(':')[0]);
+            if (Number.isNaN(hour)) return '';
+
+            const clock = this.localiseDigits(this.to12h(raw), code);
+            const word = this.meridiem[hour < 12 ? 'am' : 'pm']?.[code] ?? '';
+
+            return (clock + ' ' + word).trim();
+        },
+
+        /** Resolve any accepted spelling of a token to its canonical name. */
+        canonicalToken(token) {
+            const lower = String(token).toLowerCase();
+
+            for (const [name, spellings] of Object.entries(this.placeholders)) {
+                if (spellings.includes(lower)) return name;
+            }
+
+            return null;
+        },
+
+        /**
+         * Fill a block's placeholders for one language.
+         *
+         * An unknown token, or one whose value is not filled in yet, is left
+         * exactly as written — a visible {venue} is something the studio can
+         * see and deal with, a silently emptied one is not.
+         */
+        resolveText(body, code) {
+            const values = this.placeholderValues(code);
+
+            return String(body ?? '').replace(/\{\s*([a-z0-9_]+)\s*\}/gi, (whole, token) => {
+                const name = this.canonicalToken(token);
+                const value = name ? values[name] : null;
+
+                return value ? value : whole;
+            });
+        },
+
+        /** Blocks worth offering for a field: its own first, then the rest. */
+        assetsFor(field) {
+            const suits = this.assets.filter(a => a.field === field || ! a.field);
+            const others = this.assets.filter(a => a.field && a.field !== field);
+
+            return [...suits, ...others];
+        },
+
+        /**
+         * Drop the chosen block into a field.
+         *
+         * It goes into its own language when that language is on this
+         * invitation — a Kurdish verse belongs in the Kurdish column — and into
+         * the default language otherwise. Which column it landed in is stated
+         * rather than left to be noticed.
+         */
+        insertAsset(field) {
+            const id = this.picked[field];
+            if (! id) return;
+
+            const asset = this.assets.find(a => String(a.id) === String(id));
+            if (! asset) return;
+
+            const target = asset.locale && this.has(asset.locale) ? asset.locale : this.def;
+
+            this.text[field][target] = this.resolveText(asset.body, target);
+
+            this.assetNote[field] = asset.name + ' → ' + (this.labels[target] ?? target);
+            this.picked[field] = '';
         },
 
         async translateFromEnglish() {

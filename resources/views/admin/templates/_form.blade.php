@@ -1,6 +1,23 @@
 @php
+    use App\Models\Asset;
+
     $palette = old('palette', $template->palette());
     $settings = old('settings', $template->settings());
+
+    // Library media this design can pick from. `$library` comes from the
+    // controller, keyed by kind.
+    $videoAssets = $library[Asset::KIND_VIDEO];
+    $musicAssets = $library[Asset::KIND_MUSIC];
+
+    // Which library asset the stored file is, if it is one. Matched by path
+    // because a template holds the media URL rather than a foreign key.
+    $currentVideoAsset = filled($template->intro_video)
+        ? $videoAssets->firstWhere('path', $template->intro_video)
+        : null;
+
+    $currentMusicAsset = filled($template->music)
+        ? $musicAssets->firstWhere('path', $template->music)
+        : null;
 
     // Colour roles live in _colours.blade.php, alongside the picker.
     $settingLabels = [
@@ -56,7 +73,13 @@
     </div>
 </x-ui.card>
 
-<x-ui.card title="Media" description="The intro clip and its music.">
+<x-ui.card title="Media" description="The intro clip and its music — picked from the library, or uploaded here.">
+    <x-slot:actions>
+        <x-ui.button :href="route('admin.assets.index')" variant="ghost" size="sm" icon="rectangle-stack">
+            Library
+        </x-ui.button>
+    </x-slot:actions>
+
     <div class="space-y-5">
         <x-ui.field
             label="Intro video"
@@ -98,14 +121,39 @@
                         </span>
                     </button>
 
-                    <p class="mt-1 text-xs text-ink-400">Silent preview — click to play.</p>
+                    <p class="mt-1 text-xs text-ink-400">
+                        Silent preview — click to play.
+                        @if ($currentVideoAsset)
+                            From the library: <span class="font-medium text-ink-600">{{ $currentVideoAsset->name }}</span>.
+                        @endif
+                    </p>
                 </div>
 
-                <label class="mb-2 flex items-center gap-2 text-xs text-ink-600">
+                <label class="mb-3 flex items-center gap-2 text-xs text-ink-600">
                     <input type="checkbox" name="remove_video" value="1" class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
                     Remove current video
                 </label>
             @endif
+
+            {{-- Library pick. Blank on every render rather than preselected: it
+                 is an action ("use this one"), not a stored setting. That is
+                 what keeps a later save from re-deriving the colours, and what
+                 makes the current asset something to state in prose above
+                 rather than a selection that looks re-submittable. --}}
+            @if ($videoAssets->isNotEmpty())
+                <div class="mb-3">
+                    <x-ui.select name="intro_video_asset">
+                        <option value="">{{ $template->intro_video ? 'Keep the current video' : 'Choose from the library…' }}</option>
+                        @foreach ($videoAssets as $asset)
+                            <option value="{{ $asset->id }}">
+                                {{ $asset->name }}{{ $asset->base_template ? '' : ' (shared)' }}
+                            </option>
+                        @endforeach
+                    </x-ui.select>
+                    <x-ui.error name="intro_video_asset" />
+                </div>
+            @endif
+
             <input
                 type="file"
                 name="intro_video"
@@ -113,6 +161,16 @@
                 accept="video/mp4,video/webm,video/quicktime"
                 class="block w-full text-sm text-ink-600 file:mr-3 file:rounded-md file:border-0 file:bg-ink-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-ink-700 hover:file:bg-ink-200"
             >
+
+            <p class="mt-1.5 text-xs text-ink-400">
+                @if ($videoAssets->isEmpty())
+                    Nothing in the library for this design yet —
+                    <a href="{{ route('admin.assets.create', ['kind' => 'video']) }}" class="underline">add a clip</a>
+                    to reuse it across templates.
+                @else
+                    An upload here wins over the library choice above.
+                @endif
+            </p>
         </x-ui.field>
 
         <x-ui.field
@@ -122,11 +180,33 @@
         >
             @if ($template->music)
                 <audio src="{{ $template->music }}" class="mb-2 w-full max-w-md" controls preload="none"></audio>
-                <label class="mb-2 flex items-center gap-2 text-xs text-ink-600">
+
+                @if ($currentMusicAsset)
+                    <p class="mb-2 text-xs text-ink-400">
+                        From the library: <span class="font-medium text-ink-600">{{ $currentMusicAsset->name }}</span>.
+                    </p>
+                @endif
+
+                <label class="mb-3 flex items-center gap-2 text-xs text-ink-600">
                     <input type="checkbox" name="remove_music" value="1" class="rounded border-ink-300 text-brand-600 focus:ring-brand-500">
                     Remove current track
                 </label>
             @endif
+
+            @if ($musicAssets->isNotEmpty())
+                <div class="mb-3">
+                    <x-ui.select name="music_asset">
+                        <option value="">{{ $template->music ? 'Keep the current track' : 'Choose from the library…' }}</option>
+                        @foreach ($musicAssets as $asset)
+                            <option value="{{ $asset->id }}">
+                                {{ $asset->name }}{{ $asset->base_template ? '' : ' (shared)' }}
+                            </option>
+                        @endforeach
+                    </x-ui.select>
+                    <x-ui.error name="music_asset" />
+                </div>
+            @endif
+
             <input
                 type="file"
                 name="music"
@@ -134,6 +214,16 @@
                 accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/aac,audio/mp4,audio/x-m4a,audio/flac"
                 class="block w-full text-sm text-ink-600 file:mr-3 file:rounded-md file:border-0 file:bg-ink-100 file:px-3 file:py-2 file:text-xs file:font-medium file:text-ink-700 hover:file:bg-ink-200"
             >
+
+            <p class="mt-1.5 text-xs text-ink-400">
+                @if ($musicAssets->isEmpty())
+                    Nothing in the library for this design yet —
+                    <a href="{{ route('admin.assets.create', ['kind' => 'music']) }}" class="underline">add a track</a>
+                    to reuse it across templates.
+                @else
+                    An upload here wins over the library choice above.
+                @endif
+            </p>
         </x-ui.field>
     </div>
 </x-ui.card>

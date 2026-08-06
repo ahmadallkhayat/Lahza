@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Models\Asset;
 use App\Models\Template;
 use App\Support\BaseTemplates;
 use App\Support\UploadLimit;
@@ -42,6 +43,18 @@ class TemplateRequest extends FormRequest
             'remove_video' => ['nullable', 'boolean'],
             'remove_music' => ['nullable', 'boolean'],
             'derive_palette' => ['nullable', 'boolean'],
+
+            // Media taken from the library instead of uploaded. Constrained to
+            // the right kind so a music asset cannot be selected as the intro
+            // clip, which would give a guest a video element playing an MP3.
+            'intro_video_asset' => [
+                'nullable',
+                Rule::exists('assets', 'id')->where('kind', Asset::KIND_VIDEO),
+            ],
+            'music_asset' => [
+                'nullable',
+                Rule::exists('assets', 'id')->where('kind', Asset::KIND_MUSIC),
+            ],
 
             // Colours and timings arrive as sub-arrays keyed by role.
             'palette' => ['array'],
@@ -114,7 +127,14 @@ class TemplateRequest extends FormRequest
         // this one is read rather than preserved.
         $data['is_active'] = $this->boolean('is_active');
 
-        unset($data['remove_video'], $data['remove_music'], $data['derive_palette']);
+        // All four are instructions to the controller, not columns.
+        unset(
+            $data['remove_video'],
+            $data['remove_music'],
+            $data['derive_palette'],
+            $data['intro_video_asset'],
+            $data['music_asset'],
+        );
 
         return $data;
     }

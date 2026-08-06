@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\TemplateRequest;
+use App\Models\Asset;
 use App\Models\Template;
 use App\Services\VideoPaletteExtractor;
 use App\Support\BaseTemplates;
 use App\Support\MediaStore;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -28,6 +30,7 @@ class TemplateController extends Controller
         return view('admin.templates.create', [
             'template' => new Template,
             'baseTemplates' => BaseTemplates::available(),
+            'library' => $this->library(null),
         ]);
     }
 
@@ -36,8 +39,13 @@ class TemplateController extends Controller
         $data = $request->cleaned();
         $data['slug'] = $data['slug'] ?? $this->uniqueSlug($data['name']);
 
-        $data['intro_video'] = MediaStore::put($request, 'intro_video', 'templates/videos');
-        $data['music'] = MediaStore::put($request, 'music', 'templates/music');
+        // An upload wins over a library pick — asking for both most likely
+        // means "use this one instead".
+        $data['intro_video'] = MediaStore::put($request, 'intro_video', 'templates/videos')
+            ?? $this->selectedAsset($request, 'intro_video_asset')?->path;
+
+        $data['music'] = MediaStore::put($request, 'music', 'templates/music')
+            ?? $this->selectedAsset($request, 'music_asset')?->path;
 
         $note = $this->maybeDerivePalette($request, $data, $data['intro_video']);
 
@@ -52,6 +60,7 @@ class TemplateController extends Controller
         return view('admin.templates.edit', [
             'template' => $template,
             'baseTemplates' => BaseTemplates::available(),
+            'library' => $this->library($template->base_template),
         ]);
     }
 
@@ -60,8 +69,8 @@ class TemplateController extends Controller
         $data = $request->cleaned();
         $data['slug'] = $data['slug'] ?? $template->slug;
 
-        $this->applyMedia($request, $data, $template, 'intro_video', 'templates/videos', 'remove_video');
-        $this->applyMedia($request, $data, $template, 'music', 'templates/music', 'remove_music');
+        $this->applyMedia($request, $data, $template, 'intro_video', 'templates/videos', 'remove_video', 'intro_video_asset');
+        $this->applyMedia($request, $data, $template, 'music', 'templates/music', 'remove_music', 'music_asset');
 
         // array_key_exists, not ??: a removal sets the key to null on purpose,
         // and `?? $template->intro_video` would resurrect the deleted file's URL.
@@ -87,8 +96,8 @@ class TemplateController extends Controller
             return back()->with('error', 'That template still has invitations. Delete those first.');
         }
 
-        MediaStore::forget($template->intro_video);
-        MediaStore::forget($template->music);
+        $this->releaseMedia($template->intro_video);
+        $this->releaseMedia($template->music);
 
         $template->delete();
 
@@ -96,11 +105,12 @@ class TemplateController extends Controller
     }
 
     /**
-     * Settle one media field on update: replace, clear, or leave alone.
+     * Settle one media field on update: replace, take from the library, clear,
+     * or leave alone.
      *
-     * A new upload wins over a tick in the remove box — asking for both most
-     * likely means "use this one instead". Absent both, the stored file is left
-     * untouched rather than nulled.
+     * Precedence is upload, then library pick, then the remove box — asking for
+     * more than one most likely means "use this one instead". Absent all three,
+     * the stored file is left untouched rather than nulled.
      *
      * @param  array<string, mixed>  $data
      */
@@ -111,22 +121,91 @@ class TemplateController extends Controller
         string $field,
         string $directory,
         string $removeKey,
+        string $assetKey,
     ): void {
         if ($uploaded = MediaStore::put($request, $field, $directory)) {
-            MediaStore::forget($template->{$field});
+            $this->releaseMedia($template->{$field});
             $data[$field] = $uploaded;
 
             return;
         }
 
+        if ($asset = $this->selectedAsset($request, $assetKey)) {
+            $this->releaseMedia($template->{$field});
+            $data[$field] = $asset->path;
+
+            return;
+        }
+
         if ($request->boolean($removeKey)) {
-            MediaStore::forget($template->{$field});
+            $this->releaseMedia($template->{$field});
             $data[$field] = null;
 
             return;
         }
 
         unset($data[$field]);
+    }
+
+    /**
+     * Delete a file this template is letting go of — unless the library owns it.
+     *
+     * Templates hold the media URL rather than a foreign key, so several can
+     * point at the same library file. Deleting on replacement would empty that
+     * asset for every other template using it, and for the library itself.
+     * A file the template uploaded for its own use has no such claim on it and
+     * is deleted as before.
+     */
+    private function releaseMedia(?string $url): void
+    {
+        if (blank($url) || Asset::ownsPath($url)) {
+            return;
+        }
+
+        MediaStore::forget($url);
+    }
+
+    /**
+     * The library asset picked in a dropdown, if one was and it has a file.
+     *
+     * The selects default to blank on every render, so a value here is always a
+     * deliberate act rather than a stored setting being resubmitted — which is
+     * what lets picking a clip re-derive the palette without every later save
+     * doing it again.
+     */
+    private function selectedAsset(TemplateRequest $request, string $key): ?Asset
+    {
+        $id = $request->input($key);
+
+        if (blank($id)) {
+            return null;
+        }
+
+        $asset = Asset::find($id);
+
+        return $asset && filled($asset->path) ? $asset : null;
+    }
+
+    /**
+     * Media in the library this design can pick from — its own and the shared
+     * ones — keyed by kind.
+     *
+     * @return array<string, Collection<int, Asset>>
+     */
+    private function library(?string $baseTemplate): array
+    {
+        $assets = Asset::query()
+            ->active()
+            ->whereIn('kind', Asset::MEDIA_KINDS)
+            ->whereNotNull('path')
+            ->forBaseTemplate($baseTemplate)
+            ->ordered()
+            ->get();
+
+        return [
+            Asset::KIND_VIDEO => $assets->where('kind', Asset::KIND_VIDEO),
+            Asset::KIND_MUSIC => $assets->where('kind', Asset::KIND_MUSIC),
+        ];
     }
 
     /**
@@ -144,7 +223,12 @@ class TemplateController extends Controller
      */
     private function maybeDerivePalette(TemplateRequest $request, array &$data, ?string $videoUrl): string
     {
-        $fromNewUpload = $request->hasFile('intro_video');
+        // Picking a clip from the library is the same act as uploading one, so
+        // it derives the colours too. The select is blank on every render, so
+        // this only fires on the save that chose it — a later save does not
+        // quietly overwrite colours that have since been tuned by hand.
+        $fromNewUpload = $request->hasFile('intro_video')
+            || filled($request->input('intro_video_asset'));
 
         if (! $fromNewUpload && ! $request->boolean('derive_palette')) {
             return '';

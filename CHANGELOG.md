@@ -11,6 +11,36 @@ Unreleased into a dated section and raises the number in `VERSION`.
 
 ## [Unreleased]
 
+### Added
+
+- An asset library at `/admin/assets`, held per base template with a shared
+  section for anything every design can use. Intro clips and music are stored
+  once and then picked from a dropdown on a template rather than re-uploaded
+  per theme; picking a clip derives the colours from it just as uploading one
+  does.
+- Text assets in the same library — Quran verses, hosting lines, anything worth
+  keeping — written with placeholders such as `{bride}` and `{groom}` and
+  inserted into an invitation's content fields with the names filled in.
+  Spelling is forgiving: `{bride}`, `{bridename}` and `{bride_name}` all
+  resolve, and `{date}` and `{time}` render exactly as the invitation does,
+  Arabic-Indic digits and translated meridiem included.
+- An unrecognised placeholder is left exactly as written rather than replaced
+  with nothing, and the asset form names the ones nothing will ever fill while
+  the text is being typed.
+- Seeded library: the luxury wedding template's own clip and track, the verse
+  the pages open with, and hosting lines in all three languages.
+
+### Changed
+
+- A template releasing its media no longer deletes the file when the library
+  owns it. Several templates can point at one asset, so swapping the clip on
+  one theme used to be able to empty it for every other — and for the library.
+  A file a template uploaded for itself is still deleted as before.
+- Replacing an asset's file moves every template already using it onto the new
+  one, rather than leaving them on a file the library no longer lists.
+- Deleting an asset a template still uses is refused, and the library says
+  which templates are in the way before the button is clicked.
+
 ## [0.1.0] - 2026-08-06
 
 First tagged version. Everything below already existed; this is the point
