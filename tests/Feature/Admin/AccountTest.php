@@ -4,6 +4,7 @@ namespace Tests\Feature\Admin;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -220,16 +221,17 @@ class AccountTest extends TestCase
     /**
      * Changing a password should end sessions opened with the old one, or a
      * change made *because* someone else got in achieves nothing.
+     *
+     * The suite runs on the array driver, so the database driver production
+     * actually uses is forced here — otherwise this would quietly never run.
      */
     public function test_changing_the_password_evicts_other_sessions(): void
     {
-        if (config('session.driver') !== 'database') {
-            $this->markTestSkipped('Other-session eviction only applies to the database driver.');
-        }
+        config(['session.driver' => 'database']);
 
         $user = $this->studio();
 
-        \DB::table('sessions')->insert([
+        DB::table('sessions')->insert([
             'id' => 'someone-elses-session',
             'user_id' => $user->id,
             'ip_address' => '203.0.113.9',
@@ -245,6 +247,47 @@ class AccountTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $this->assertDatabaseMissing('sessions', ['id' => 'someone-elses-session']);
+    }
+
+    /** A profile save is not a password change, so it must not evict anyone. */
+    public function test_updating_the_profile_leaves_other_sessions_alone(): void
+    {
+        config(['session.driver' => 'database']);
+
+        $user = $this->studio();
+
+        DB::table('sessions')->insert([
+            'id' => 'another-session',
+            'user_id' => $user->id,
+            'ip_address' => '203.0.113.9',
+            'user_agent' => 'other device',
+            'payload' => '',
+            'last_activity' => now()->timestamp,
+        ]);
+
+        $this->actingAs($user)->put('/admin/account', [
+            'name' => 'Renamed',
+            'username' => 'admin',
+            'email' => 'admin@lahza.test',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('sessions', ['id' => 'another-session']);
+    }
+
+    /** With a non-database driver there are no rows to clear; must not error. */
+    public function test_password_change_still_works_on_a_non_database_session_driver(): void
+    {
+        config(['session.driver' => 'array']);
+
+        $user = $this->studio();
+
+        $this->actingAs($user)->put('/admin/account/password', [
+            'current_password' => 'password',
+            'password' => 'a-much-better-secret',
+            'password_confirmation' => 'a-much-better-secret',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertTrue(Hash::check('a-much-better-secret', $user->fresh()->password));
     }
 
     /** One account, edited via the session — never a user chosen by id. */
