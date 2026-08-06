@@ -59,6 +59,28 @@ Rollback swaps code only — **database migrations are not reverted**. Write
 migrations so the previous release can still run against the new schema
 (add columns, don't rename or drop in the same deploy as the code change).
 
+## Upload limits
+
+Uploads are unlimited, which takes three layers agreeing. Raising one alone
+does nothing — the smallest wins, and PHP/nginx reject an oversized body
+before Laravel can turn it into a readable validation message.
+
+| Layer | Setting | Value |
+|-------|---------|-------|
+| nginx | `client_max_body_size` | `0` (checking disabled) |
+| PHP-FPM | `post_max_size` | `0` (limit disabled) |
+| PHP-FPM | `upload_max_filesize` | `10G` (no unlimited value exists) |
+| App | `templates.max_video_kb` / `max_music_kb` | `null` |
+
+The PHP side lives in `/etc/php/8.5/fpm/conf.d/99-lahza.ini` — a separate
+file so a `php8.5-fpm` package upgrade cannot revert it. nginx's is in
+`/etc/nginx/sites-available/lahza`, together with the 3600s FastCGI timeouts
+that a long upload plus ffmpeg palette extraction needs.
+
+**Neither is in this repo**, so a rebuilt server starts from the distro
+defaults (`post_max_size 8M`, `upload_max_filesize 2M`) and uploads over 8MB
+fail with a bare 413.
+
 ## Secrets
 
 `shared/.env` is the only copy of production config and is not in git.

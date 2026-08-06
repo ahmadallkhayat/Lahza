@@ -18,6 +18,12 @@ php8.5-bcmath
 php8.5-gd
 php8.5-intl
 
+# --- Filesystem ------------------------------------------------------------
+# setfacl. Shared storage is written by both php-fpm (www-data) and the deploy
+# user; default ACLs keep new upload directories writable by both regardless
+# of whose umask created them.
+acl
+
 # --- Media -----------------------------------------------------------------
 # VideoPaletteExtractor samples frames with ffmpeg and reads duration with
 # ffprobe. Without these, palette extraction silently falls back to the
