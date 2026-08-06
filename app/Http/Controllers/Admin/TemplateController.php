@@ -80,8 +80,11 @@ class TemplateController extends Controller
     {
         // Invitations cascade at the database level, so refuse rather than
         // silently take a customer's invitation down with the design.
+        //
+        // Flashed as an error, not a status: a refusal dressed as a green
+        // "success" banner reads as though the delete worked.
         if ($template->invitations()->exists()) {
-            return back()->with('status', 'That template still has invitations. Delete those first.');
+            return back()->with('error', 'That template still has invitations. Delete those first.');
         }
 
         MediaStore::forget($template->intro_video);

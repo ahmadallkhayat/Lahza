@@ -65,20 +65,26 @@
                         </x-ui.td>
 
                         <x-ui.td class="text-end">
-                            <div class="flex items-center justify-end gap-1">
-                                <x-ui.button :href="route('admin.templates.edit', $template)" variant="ghost" size="sm">Edit</x-ui.button>
+                            <div class="flex items-center justify-end gap-0.5">
+                                <x-ui.icon-button
+                                    :href="route('admin.templates.edit', $template)"
+                                    icon="pencil-square"
+                                    :label="'Edit '.$template->name"
+                                />
 
-                                <form
-                                    method="POST"
-                                    action="{{ route('admin.templates.destroy', $template) }}"
-                                    onsubmit="return confirm('Delete this template?')"
-                                >
-                                    @csrf
-                                    @method('DELETE')
-                                    <x-ui.button type="submit" variant="ghost" size="sm" class="text-bad-600 hover:bg-bad-50">
-                                        Delete
-                                    </x-ui.button>
-                                </form>
+                                {{-- The controller refuses to delete a template that
+                                     invitations still point at. Saying so on the button
+                                     beats letting them click and be told afterwards. --}}
+                                <x-ui.delete-button
+                                    :action="route('admin.templates.destroy', $template)"
+                                    :label="'Delete '.$template->name"
+                                    :confirm="'Delete the template “'.$template->name.'”? This cannot be undone.'"
+                                    :reason="$template->invitations_count > 0
+                                        ? 'Cannot delete — '.$template->invitations_count.' '
+                                            .Str::plural('invitation', $template->invitations_count).' still '
+                                            .($template->invitations_count === 1 ? 'uses' : 'use').' this template'
+                                        : null"
+                                />
                             </div>
                         </x-ui.td>
                     </tr>

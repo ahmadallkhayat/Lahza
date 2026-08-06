@@ -118,6 +118,22 @@
                 <x-ui.alert tone="ok" class="mb-6">{{ session('status') }}</x-ui.alert>
             @endif
 
+            {{-- Refusals and failures. Separate from `status` so a "no, and
+                 here is why" cannot be flashed in success green. --}}
+            @if (session('error'))
+                <x-ui.alert tone="bad" class="mb-6">{{ session('error') }}</x-ui.alert>
+            @endif
+
+            {{-- Validation errors are otherwise only visible next to the field
+                 that failed, which can be far below the fold on these forms. --}}
+            @if ($errors->any())
+                <x-ui.alert tone="bad" title="That could not be saved" class="mb-6">
+                    {{ $errors->count() === 1
+                        ? 'One field needs attention.'
+                        : $errors->count().' fields need attention.' }}
+                </x-ui.alert>
+            @endif
+
             {{ $slot }}
         </div>
     </main>

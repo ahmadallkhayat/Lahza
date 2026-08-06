@@ -140,7 +140,15 @@
 
 @include('admin.templates._colours')
 
-<x-ui.card title="Reveal timings" description="How the intro hands over to the invitation.">
+{{-- Collapsed by default: the defaults are usually right, and eight number
+     fields between the media and the save button is a lot to scroll past on
+     every edit. --}}
+<x-ui.card
+    title="Reveal timings"
+    description="How the intro hands over to the invitation. The defaults suit most templates."
+    collapsible
+    :open="$errors->hasAny(array_map(fn ($k) => 'settings.'.$k, array_keys($settingLabels)))"
+>
     <div class="grid gap-5 sm:grid-cols-2">
         @foreach ($settingLabels as $key => [$label, $hint])
             <x-ui.field :label="$label" :name="'settings.'.$key" :for="'settings_'.$key" :hint="$hint">

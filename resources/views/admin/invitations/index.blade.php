@@ -50,7 +50,8 @@
                                             ? route('invitations.show', $invitation)
                                             : route('invitations.show.locale', [$invitation, $code]) }}"
                                         target="_blank"
-                                        title="{{ config("templates.locales.{$code}.label") }}"
+                                        rel="noopener"
+                                        title="Open the {{ config("templates.locales.{$code}.label") }} link in a new tab"
                                     >
                                         <x-ui.badge :tone="$code === $invitation->defaultLocale() ? 'brand' : 'neutral'">
                                             {{ strtoupper($code) }}
@@ -68,44 +69,50 @@
                             @endif
                         </x-ui.td>
 
+                        @php($couple = $invitation->groom_ar.' & '.$invitation->bride_ar)
+
                         <x-ui.td class="text-end">
-                            <div class="flex items-center justify-end gap-1">
-                                <x-ui.button
+                            <div class="flex items-center justify-end gap-0.5">
+                                <x-ui.icon-button
                                     :href="route('admin.invitations.edit', $invitation)"
-                                    variant="ghost"
-                                    size="sm"
-                                >
-                                    Edit
-                                </x-ui.button>
+                                    icon="pencil-square"
+                                    :label="'Edit the invitation for '.$couple"
+                                />
 
-                                <x-ui.button
+                                <x-ui.copy-button
+                                    :value="route('invitations.show', $invitation)"
+                                    :label="'Copy the link for '.$couple"
+                                />
+
+                                <x-ui.icon-button
                                     :href="route('invitations.show', $invitation)"
-                                    variant="ghost"
-                                    size="sm"
+                                    icon="arrow-top-right-on-square"
+                                    :label="'Open the invitation for '.$couple.' in a new tab'"
                                     target="_blank"
-                                >
-                                    View
-                                </x-ui.button>
+                                    rel="noopener"
+                                />
 
+                                {{-- Publishing is what makes the link resolve at all, so
+                                     the icon reflects the state rather than the action:
+                                     a lit globe means live. --}}
                                 <form method="POST" action="{{ route('admin.invitations.publish', $invitation) }}">
                                     @csrf
                                     @method('PATCH')
-                                    <x-ui.button type="submit" variant="ghost" size="sm">
-                                        {{ $invitation->published ? 'Unpublish' : 'Publish' }}
-                                    </x-ui.button>
+                                    <x-ui.icon-button
+                                        type="submit"
+                                        :icon="$invitation->published ? 'globe-alt' : 'eye-slash'"
+                                        :tone="$invitation->published ? 'ok' : 'default'"
+                                        :label="$invitation->published
+                                            ? 'Unpublish — the link will stop working'
+                                            : 'Publish — make the link live'"
+                                    />
                                 </form>
 
-                                <form
-                                    method="POST"
-                                    action="{{ route('admin.invitations.destroy', $invitation) }}"
-                                    onsubmit="return confirm('Delete this invitation?')"
-                                >
-                                    @csrf
-                                    @method('DELETE')
-                                    <x-ui.button type="submit" variant="ghost" size="sm" class="text-bad-600 hover:bg-bad-50">
-                                        Delete
-                                    </x-ui.button>
-                                </form>
+                                <x-ui.delete-button
+                                    :action="route('admin.invitations.destroy', $invitation)"
+                                    :label="'Delete the invitation for '.$couple"
+                                    :confirm="'Delete the invitation for '.$couple.'? The link will stop working. This cannot be undone.'"
+                                />
                             </div>
                         </x-ui.td>
                     </tr>

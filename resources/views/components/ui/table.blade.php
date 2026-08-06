@@ -10,7 +10,9 @@
             </thead>
         @endisset
 
-        <tbody class="divide-y divide-ink-200">
+        {{-- Row hover: with actions at the far right of a wide row, a highlight
+             is what keeps your eye on the record you picked. --}}
+        <tbody class="divide-y divide-ink-200 [&>tr]:transition-colors [&>tr:hover]:bg-ink-50/60">
             {{ $slot }}
         </tbody>
     </table>
