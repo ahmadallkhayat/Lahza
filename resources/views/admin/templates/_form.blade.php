@@ -61,7 +61,7 @@
         <x-ui.field
             label="Intro video"
             name="intro_video"
-            :hint="'MP4, WebM or MOV, up to '.round(config('templates.max_video_kb') / 1000).'MB. Colours are generated from it below.'"
+            :hint="'MP4, WebM or MOV, '.\App\Support\UploadLimit::describe('templates.max_video_kb').'. Colours are generated from it below.'"
         >
             @if ($template->intro_video)
                 {{-- No `controls`: the native player chrome — scrub bar, volume,
@@ -118,7 +118,7 @@
         <x-ui.field
             label="Music"
             name="music"
-            :hint="'MP3, WAV, OGG, AAC, M4A or FLAC, up to '.round(config('templates.max_music_kb') / 1024).'MB. Prefer MP3 — guests download this on their phones. Plays only after the guest taps.'"
+            :hint="'MP3, WAV, OGG, AAC, M4A or FLAC, '.\App\Support\UploadLimit::describe('templates.max_music_kb').'. Prefer MP3 — guests download this on their phones. Plays only after the guest taps.'"
         >
             @if ($template->music)
                 <audio src="{{ $template->music }}" class="mb-2 w-full max-w-md" controls preload="none"></audio>

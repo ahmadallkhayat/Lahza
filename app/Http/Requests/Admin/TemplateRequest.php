@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Models\Template;
 use App\Support\BaseTemplates;
+use App\Support\UploadLimit;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,12 +32,12 @@ class TemplateRequest extends FormRequest
             'intro_video' => [
                 'nullable', 'file',
                 'mimetypes:video/mp4,video/webm,video/quicktime',
-                'max:'.config('templates.max_video_kb'),
+                ...UploadLimit::rule('templates.max_video_kb'),
             ],
             'music' => [
                 'nullable', 'file',
                 'mimetypes:audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/ogg,audio/aac,audio/mp4,audio/x-m4a,audio/flac,audio/x-flac',
-                'max:'.config('templates.max_music_kb'),
+                ...UploadLimit::rule('templates.max_music_kb'),
             ],
             'remove_video' => ['nullable', 'boolean'],
             'remove_music' => ['nullable', 'boolean'],

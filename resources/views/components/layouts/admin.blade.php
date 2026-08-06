@@ -83,6 +83,16 @@
                 Sign out
             </x-ui.button>
         </form>
+
+        {{-- Which build you are looking at. The commit only exists on a
+             deployed release, so locally this is just the version. --}}
+        @php($commit = config('version.commit'))
+        <p class="px-1 pt-2.5 text-center text-[0.65rem] tabular-nums text-ink-400">
+            v{{ config('version.number') }}
+            @if ($commit)
+                <span title="{{ $commit }}">· {{ Str::substr($commit, 0, 7) }}</span>
+            @endif
+        </p>
     </div>
 </aside>
 

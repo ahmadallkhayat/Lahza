@@ -61,12 +61,18 @@ return [
     | Upload limits (kilobytes)
     |--------------------------------------------------------------------------
     |
-    | Both together must stay under php.ini's post_max_size.
+    | null means no limit, which is how production is configured — the server
+    | sets post_max_size = 0 and nginx's client_max_body_size = 0 to match.
+    |
+    | Setting a number here does NOT raise the ceiling on its own: PHP and
+    | nginx reject an oversized body before Laravel ever sees it, so any value
+    | must stay under those two or the studio gets a bare 413 instead of a
+    | proper validation message.
     |
     */
 
-    'max_video_kb' => 100000,
-    'max_music_kb' => 51200,
+    'max_video_kb' => null,
+    'max_music_kb' => null,
 
     /*
     |--------------------------------------------------------------------------

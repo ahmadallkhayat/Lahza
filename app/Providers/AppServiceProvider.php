@@ -6,6 +6,7 @@ use App\Services\Translation\GoogleFreeProvider;
 use App\Services\Translation\GoogleProvider;
 use App\Services\Translation\MyMemoryProvider;
 use App\Services\Translation\TranslationProvider;
+use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,6 +25,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        // Makes `php artisan about` answer "what is actually deployed here?",
+        // which is the first question worth asking on the server.
+        AboutCommand::add('Lahza', fn () => array_filter([
+            'Version' => config('version.number'),
+            'Commit' => config('version.commit') ?? 'not a deployed release',
+        ]));
     }
 }

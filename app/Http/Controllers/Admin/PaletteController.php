@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Template;
 use App\Services\VideoPaletteExtractor;
 use App\Support\MediaStore;
+use App\Support\UploadLimit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -24,7 +25,7 @@ class PaletteController extends Controller
             'intro_video' => [
                 'nullable', 'file',
                 'mimetypes:video/mp4,video/webm,video/quicktime',
-                'max:'.config('templates.max_video_kb'),
+                ...UploadLimit::rule('templates.max_video_kb'),
             ],
             'template_id' => ['nullable', 'exists:templates,id'],
         ]);
