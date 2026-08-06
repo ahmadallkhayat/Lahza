@@ -100,7 +100,8 @@
            row and writes the right string into every language, so the
            same time is never typed three times in two numeral systems. */
 
-        /** 24h "19:00" from the picker -> "7:00", the studio's convention. */
+        /* 24h 19:00 from the picker becomes 7:00, the studio's convention.
+           No double quotes anywhere in this attribute — see the note above. */
         to12h(value) {
             const [h, m] = String(value).split(':').map(Number);
             if (Number.isNaN(h) || Number.isNaN(m)) return '';
@@ -110,14 +111,14 @@
             return hour + ':' + String(m).padStart(2, '0');
         },
 
-        /**
-         * Best-effort read of a stored string back into "HH:MM" for the
+        /*
+         * Best-effort read of a stored string back into HH:MM for the
          * picker. Arabic-Indic digits are folded to Latin first.
          *
-         * 12-hour strings carry no meridiem, so "7:00" is genuinely
-         * ambiguous. Evening is assumed for anything from 1 to 11, which is
-         * when these events run — and the picker shows what it chose, so a
-         * wrong guess is visible and one click to fix rather than silent.
+         * 12-hour strings carry no meridiem, so 7:00 is genuinely ambiguous.
+         * Evening is assumed for anything from 1 to 11, which is when these
+         * events run — and the picker shows what it chose, so a wrong guess
+         * is visible and one click to fix rather than silent.
          */
         pickerValue(step) {
             const raw = String(step[this.def]?.time ?? step[this.locales[0]]?.time ?? '').trim();
