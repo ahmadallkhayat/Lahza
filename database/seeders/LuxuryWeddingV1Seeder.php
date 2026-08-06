@@ -86,7 +86,7 @@ class LuxuryWeddingV1Seeder extends Seeder
     private function sampleInvitation(Template $template): void
     {
         Invitation::updateOrCreate(
-            ['slug' => 'ahmad-sidra'],
+            ['slug' => 'yusuf-layla'],
             [
                 'template_id' => $template->id,
 
@@ -95,10 +95,10 @@ class LuxuryWeddingV1Seeder extends Seeder
                 'locales' => ['ar', 'ku', 'en'],
                 'default_locale' => 'ar',
 
-                'groom_ar' => 'أَحْمَد',
-                'bride_ar' => 'سِدْرَة',
-                'groom_latin' => 'Ahmad',
-                'bride_latin' => 'Sidra',
+                'groom_ar' => 'يُوسُف',
+                'bride_ar' => 'لَيْلَى',
+                'groom_latin' => 'Yusuf',
+                'bride_latin' => 'Layla',
 
                 // Built in the event's own zone. `now()` is UTC here, so
                 // setting 19:00 on that would land at 22:00 in Baghdad.

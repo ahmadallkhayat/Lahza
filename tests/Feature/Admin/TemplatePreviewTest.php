@@ -109,7 +109,7 @@ class TemplatePreviewTest extends TestCase
 
         $this->post('/admin/templates/preview', $this->payload())
             ->assertOk()
-            ->assertSee('أَحْمَد', false);
+            ->assertSee('يُوسُف', false);
     }
 
     public function test_it_can_be_previewed_in_a_chosen_language(): void

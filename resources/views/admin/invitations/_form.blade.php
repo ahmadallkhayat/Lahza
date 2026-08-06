@@ -249,7 +249,7 @@
                 name="slug"
                 hint="Left blank, generated from the names. Changing it breaks links already sent."
             >
-                <x-ui.input name="slug" :value="old('slug', $invitation->slug)" placeholder="ahmad-sidra" />
+                <x-ui.input name="slug" :value="old('slug', $invitation->slug)" placeholder="yusuf-layla" />
             </x-ui.field>
         </div>
     </div>
@@ -257,7 +257,7 @@
 
 <x-ui.card title="The couple" description="Names render in Arabic in every language.">
     <div class="grid gap-5 sm:grid-cols-2">
-        <x-ui.field label="Groom (Arabic)" name="groom_ar" required hint="Include tashkeel if you want it shown, e.g. أَحْمَد">
+        <x-ui.field label="Groom (Arabic)" name="groom_ar" required hint="Include tashkeel if you want it shown, e.g. يُوسُف">
             <x-ui.input name="groom_ar" :value="old('groom_ar', $invitation->groom_ar)" dir="rtl" required />
         </x-ui.field>
 
@@ -266,11 +266,11 @@
         </x-ui.field>
 
         <x-ui.field label="Groom (Latin)" name="groom_latin" hint="Shown small beneath the Arabic on the English link only.">
-            <x-ui.input name="groom_latin" :value="old('groom_latin', $invitation->groom_latin)" placeholder="Ahmad" />
+            <x-ui.input name="groom_latin" :value="old('groom_latin', $invitation->groom_latin)" placeholder="Yusuf" />
         </x-ui.field>
 
         <x-ui.field label="Bride (Latin)" name="bride_latin">
-            <x-ui.input name="bride_latin" :value="old('bride_latin', $invitation->bride_latin)" placeholder="Sidra" />
+            <x-ui.input name="bride_latin" :value="old('bride_latin', $invitation->bride_latin)" placeholder="Layla" />
         </x-ui.field>
 
         <label class="flex items-center gap-2 text-sm text-ink-700 sm:col-span-2">

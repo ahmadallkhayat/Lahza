@@ -136,7 +136,7 @@
                             LAHZA
                         </p>
                         <p class="mt-1 text-sm font-semibold" :style="`color: ${variant.palette.ink}`">
-                            أحمد &amp; سدرة
+                            يوسف &amp; ليلى
                         </p>
                         <p class="text-[0.65rem]" :style="`color: ${variant.palette.gold_deep}`">
                             4 December 2026
