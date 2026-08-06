@@ -12,10 +12,69 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Nothing reaches the server unless this passes. Before it existed a push
+  # went straight to production, so a broken page was only found by looking
+  # at the live site.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          # Matches the server, so a version difference cannot pass here and
+          # fail there.
+          php-version: '8.5'
+          extensions: mbstring, xml, curl, zip, bcmath, gd, intl, sqlite3, pdo_sqlite
+          coverage: none
+
+      # VideoPaletteExtractor shells out to these; without them those tests
+      # error rather than fail, and the cause is not obvious.
+      - name: Ensure ffmpeg
+        run: which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Prepare the environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # Blade calls @vite(), which needs a real manifest. Without this every
+      # page-rendering test fails on a missing build.
+      - name: Build assets
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Check formatting
+        run: ./vendor/bin/pint --test
+
+      - name: Run tests
+        run: php artisan test
+
   deploy:
     name: Deploy to lahza-invites.click
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: test
 
     steps:
       - name: Configure SSH

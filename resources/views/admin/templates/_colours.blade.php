@@ -24,63 +24,13 @@
      component attributes into a PHP array, so quotes inside the expression break
      out of the generated string. --}}
 <div
-    x-data="{
-        palette: @js($palette),
-        variants: [],
-        chosen: null,
-        loading: false,
-        note: '',
-        ok: false,
-
-        async generate() {
-            if (this.loading) return;
-
-            this.loading = true;
-            this.note = '';
-            this.variants = [];
-
-            const body = new FormData();
-            body.append('_token', @js(csrf_token()));
-
-            // A file chosen but not yet saved is sent as-is, so this works on
-            // the create page too. Otherwise the stored video is used.
-            const picked = document.getElementById('intro_video')?.files?.[0];
-            if (picked) body.append('intro_video', picked);
-            @if ($template->exists)
-                else body.append('template_id', @js($template->id));
-            @endif
-
-            try {
-                const response = await fetch(@js(route('admin.templates.palettes')), {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json' },
-                    body,
-                });
-
-                const data = await response.json();
-
-                if (! response.ok) {
-                    this.ok = false;
-                    this.note = data.message ?? 'Could not read that video.';
-                    return;
-                }
-
-                this.variants = data.variants;
-                this.ok = true;
-                this.note = `${data.variants.length} palettes from this video — pick one.`;
-            } catch (e) {
-                this.ok = false;
-                this.note = 'The request failed. Nothing was changed.';
-            } finally {
-                this.loading = false;
-            }
-        },
-
-        apply(variant) {
-            this.palette = { ...variant.palette };
-            this.chosen = variant.key;
-        },
-    }"
+    x-data="palettePicker(@js([
+        'palette' => $palette,
+        'palettesUrl' => route('admin.templates.palettes'),
+        // Null on the create page: there is no saved template to read a
+        // stored video from, so only a freshly picked file can be sent.
+        'templateId' => $template->exists ? $template->id : null,
+    ]))"
 >
 <x-ui.card
     title="Colours"

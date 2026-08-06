@@ -9,18 +9,23 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Alpine components on these pages live inside an x-data="..." attribute.
- * The attribute is delimited by a double quote, so a single literal double
- * quote anywhere inside it — including in a comment — closes the attribute
- * early and dumps the remaining JavaScript onto the page as visible text.
+ * JavaScript belongs in resources/js, registered with Alpine.data() and
+ * referenced by name — never written inline in an x-data="..." attribute.
  *
- * It is silent: no error, no failing request, just script showing in the UI.
- * These tests read the attribute back out of the rendered page and check it
- * still reaches its final method, which it cannot do if it was cut short.
+ * That attribute is delimited by a double quote, so one literal double quote
+ * inside it, even in a comment, closes it early and dumps the rest of the
+ * script onto the page as visible text. There is no error and no failing
+ * request; it is only noticed by looking at the page.
+ *
+ * These tests enforce the arrangement that makes it impossible, rather than
+ * checking for the symptom after the fact.
  */
 class InlineScriptIntegrityTest extends TestCase
 {
     use RefreshDatabase;
+
+    /** Anything that only appears in a function body, not in a component call. */
+    private const LOGIC_TOKENS = ['=>', 'function', 'const ', 'let ', 'return ', 'await ', '/*', '//'];
 
     protected function setUp(): void
     {
@@ -30,92 +35,121 @@ class InlineScriptIntegrityTest extends TestCase
     }
 
     /**
-     * Reads the value of the first x-data attribute appearing after $anchor,
-     * stopping at the quote the browser would stop at.
+     * Every x-data value on the page, read to the quote a browser would stop
+     * at — so an attribute broken by a stray quote yields the truncated value
+     * the browser actually sees.
+     *
+     * @return array<int, string>
      */
-    private function xDataAfter(string $html, string $anchor): string
+    private function xDataValues(string $html): array
     {
-        $from = strpos($html, $anchor);
-        $this->assertNotFalse($from, "Anchor not found in page: {$anchor}");
+        $values = [];
+        $offset = 0;
 
-        $start = strpos($html, 'x-data="', $from);
-        $this->assertNotFalse($start, 'No x-data attribute after the anchor.');
+        while (($start = strpos($html, 'x-data="', $offset)) !== false) {
+            $start += strlen('x-data="');
+            $end = strpos($html, '"', $start);
 
-        $start += strlen('x-data="');
-        $end = strpos($html, '"', $start);
+            $values[] = substr($html, $start, $end - $start);
+            $offset = $end;
+        }
 
-        return substr($html, $start, $end - $start);
+        return $values;
     }
 
-    public function test_the_invitation_form_script_stays_inside_its_attribute(): void
+    /** @return array<int, string> */
+    private function adminPages(): array
     {
         $invitation = Invitation::factory()->create();
-
-        $html = $this->get("/admin/invitations/{$invitation->slug}/edit")->assertOk()->getContent();
-
-        $script = $this->xDataAfter($html, 'class="space-y-6"');
-
-        $this->assertStringContainsString(
-            'applyTranslations',
-            $script,
-            'The x-data attribute closed early. A literal double quote inside it — often in a '
-            .'comment — breaks out and dumps the rest of the script onto the page as text.'
-        );
-    }
-
-    /** The same trap, on the page that already carries a warning about it. */
-    public function test_the_template_preview_script_stays_inside_its_attribute(): void
-    {
-        $html = $this->get('/admin/templates/create')->assertOk()->getContent();
-
-        // Anchored on the class attribute that precedes x-data on the preview
-        // wrapper — anchoring on something inside the attribute would search
-        // past the very thing being read.
-        $script = $this->xDataAfter($html, '@4xl:sticky');
-
-        $this->assertStringContainsString(
-            'paintColours',
-            $script,
-            'The preview x-data attribute closed early — see the note in _preview.blade.php.'
-        );
-    }
-
-    public function test_the_template_edit_page_script_stays_inside_its_attribute(): void
-    {
         $template = Template::factory()->create();
 
-        $html = $this->get("/admin/templates/{$template->id}/edit")->assertOk()->getContent();
+        return [
+            '/admin',
+            '/admin/invitations',
+            '/admin/templates',
+            '/admin/invitations/create',
+            "/admin/invitations/{$invitation->slug}/edit",
+            '/admin/templates/create',
+            "/admin/templates/{$template->id}/edit",
+            '/admin/account',
+        ];
+    }
 
-        // Anchored on the class attribute that precedes x-data on the preview
-        // wrapper — anchoring on something inside the attribute would search
-        // past the very thing being read.
-        $script = $this->xDataAfter($html, '@4xl:sticky');
+    public function test_no_page_defines_a_javascript_body_inside_an_attribute(): void
+    {
+        foreach ($this->adminPages() as $page) {
+            $html = $this->get($page)->assertOk()->getContent();
 
-        $this->assertStringContainsString('paintColours', $script);
+            foreach ($this->xDataValues($html) as $value) {
+                foreach (self::LOGIC_TOKENS as $token) {
+                    $this->assertStringNotContainsString(
+                        $token,
+                        $value,
+                        "{$page} defines JavaScript inside an x-data attribute (found \"{$token}\"). "
+                        .'Move it to resources/js and register it with Alpine.data() — a literal '
+                        .'double quote in there breaks the attribute and spills the script onto the page.'
+                    );
+                }
+            }
+        }
+    }
+
+    /** The components are still wired up, not merely absent. */
+    public function test_the_form_components_are_referenced_by_name(): void
+    {
+        $invitation = Invitation::factory()->create();
+        $template = Template::factory()->create();
+
+        $this->get("/admin/invitations/{$invitation->slug}/edit")
+            ->assertOk()
+            ->assertSee('invitationForm(', false);
+
+        $this->get('/admin/invitations/create')
+            ->assertOk()
+            ->assertSee('invitationForm(', false);
+
+        $this->get("/admin/templates/{$template->id}/edit")
+            ->assertOk()
+            ->assertSee('templatePreview(', false);
+
+        $this->get('/admin/templates/create')
+            ->assertOk()
+            ->assertSee('templatePreview(', false);
     }
 
     /**
-     * The symptom as a user meets it: JavaScript rendered as page text.
-     * Checks the tail of each component, which is what surfaces first.
+     * The server data each component needs must survive the trip through the
+     * attribute. Blade escapes it, so quotes inside it are safe — but a
+     * missing key would leave the component silently inert.
+     */
+    public function test_the_components_receive_their_server_data(): void
+    {
+        $invitation = Invitation::factory()->locales(['ar', 'en'], 'ar')->create();
+
+        $html = $this->get("/admin/invitations/{$invitation->slug}/edit")->assertOk()->getContent();
+
+        $component = collect($this->xDataValues($html))
+            ->first(fn ($value) => str_contains($value, 'invitationForm('));
+
+        $this->assertNotNull($component, 'The invitation form component was not found.');
+
+        foreach (['locales', 'labels', 'numerals', 'steps', 'translateUrl'] as $key) {
+            $this->assertStringContainsString(
+                $key,
+                $component,
+                "The invitation form was not passed \"{$key}\"."
+            );
+        }
+    }
+
+    /**
+     * The symptom as a user meets it: script rendered as page text. Kept
+     * alongside the structural checks because it is what actually got noticed.
      */
     public function test_no_script_is_rendered_as_visible_text(): void
     {
-        $invitation = Invitation::factory()->create();
-        $template = Template::factory()->create();
-
-        $pages = [
-            "/admin/invitations/{$invitation->slug}/edit",
-            '/admin/invitations/create',
-            "/admin/templates/{$template->id}/edit",
-            '/admin/templates/create',
-        ];
-
-        foreach ($pages as $page) {
-            $html = $this->get($page)->assertOk()->getContent();
-
-            // Text nodes only: everything inside a tag is stripped first, so
-            // a legitimate attribute containing script does not trip this.
-            $text = strip_tags($html);
+        foreach ($this->adminPages() as $page) {
+            $text = strip_tags($this->get($page)->assertOk()->getContent());
 
             foreach (['applyTranslations', 'paintColours', 'setStepTime', 'const ', '=> {'] as $token) {
                 $this->assertStringNotContainsString(
