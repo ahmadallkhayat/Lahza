@@ -3,6 +3,8 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\Invitation;
+use App\Models\Template;
+use App\Support\ContentSlots;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -44,6 +46,12 @@ class InvitationRequest extends FormRequest
             'venue_name.*' => ['nullable', 'string', 'max:255'],
             'venue_city' => ['array'],
             'venue_city.*' => ['nullable', 'string', 'max:255'],
+
+            // Slot content is filtered against what the design declares in
+            // cleaned(), so the rules only have to bound its size.
+            'content' => ['array'],
+            'content.*' => ['array'],
+            'content.*.*' => ['nullable', 'string', 'max:4000'],
 
             'programme' => ['array'],
             'programme.*' => ['array', 'max:30'],
@@ -98,6 +106,7 @@ class InvitationRequest extends FormRequest
         }
 
         $data['programme'] = $this->programmes($locales);
+        $data['content'] = $this->slots($locales);
         $data['locales'] = $locales;
         $data['show_verse'] = $this->boolean('show_verse');
         $data['published'] = $this->boolean('published');
@@ -119,6 +128,44 @@ class InvitationRequest extends FormRequest
 
             if ($value !== '') {
                 $kept[$locale] = $value;
+            }
+        }
+
+        return $kept === [] ? null : $kept;
+    }
+
+    /**
+     * Values for the slots this invitation's design declares.
+     *
+     * Only declared slots are kept, so a posted key that no design asked for
+     * cannot end up in the column — the form is generated from the same list,
+     * making anything else a forged field rather than a mistake.
+     *
+     * An empty slot is dropped rather than stored blank, because empty means
+     * "use the design's own wording" and a stored empty string would instead
+     * mean "show nothing".
+     *
+     * @param  array<int, string>  $locales
+     * @return array<string, array<string, string>>|null
+     */
+    private function slots(array $locales): ?array
+    {
+        $template = Template::find($this->input('template_id'));
+        $base = $template?->base_template;
+
+        $kept = [];
+
+        foreach (ContentSlots::for($base) as $key => $slot) {
+            $posted = (array) $this->input("content.{$key}", []);
+
+            // An Arabic-everywhere slot is one box on the form, posted under
+            // the default locale, and read back the same way.
+            $values = ($slot['arabic'] ?? false)
+                ? $this->trimmedTexts($posted, [$this->input('default_locale')])
+                : $this->trimmedTexts($posted, $locales);
+
+            if ($values !== null) {
+                $kept[$key] = $values;
             }
         }
 

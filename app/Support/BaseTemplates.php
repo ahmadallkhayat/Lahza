@@ -34,7 +34,12 @@ final class BaseTemplates
 
         foreach (File::directories($root) as $dir) {
             if (File::exists($dir.'/show.blade.php')) {
-                $found[basename($dir)] = Str::headline(basename($dir));
+                // A design may name itself in template.php; the headlined
+                // directory name is only the fallback.
+                $found[basename($dir)] = ContentSlots::label(
+                    basename($dir),
+                    Str::headline(basename($dir))
+                );
             }
         }
 

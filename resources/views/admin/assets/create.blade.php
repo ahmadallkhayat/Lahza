@@ -11,11 +11,6 @@
     <form method="POST" action="{{ route('admin.assets.store') }}" enctype="multipart/form-data" class="max-w-3xl space-y-6">
         @csrf
 
-        @include('admin.assets._form')
-
-        <div class="flex items-center gap-3">
-            <x-ui.button type="submit">Add to library</x-ui.button>
-            <x-ui.button :href="route('admin.assets.index')" variant="ghost">Cancel</x-ui.button>
-        </div>
+        @include('admin.assets._form', ['submitLabel' => 'Add to library'])
     </form>
 </x-layouts.admin>

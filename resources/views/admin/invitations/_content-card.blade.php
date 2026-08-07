@@ -58,11 +58,11 @@
 
     {{-- ── Text fields, one column per language ─────────────────────── --}}
     <div class="space-y-5">
-        @foreach (['hosts' => 'Hosting line', 'venue_name' => 'Venue', 'venue_city' => 'City'] as $field => $label)
+        @foreach ($contentFields as $field => $meta)
             <div>
-                <x-ui.label>{{ $label }}</x-ui.label>
-                @if ($field === 'hosts')
-                    <p class="mb-2 text-xs text-ink-500">The families extending the invitation.</p>
+                <x-ui.label>{{ $meta['label'] }}</x-ui.label>
+                @if ($meta['hint'])
+                    <p class="mb-2 text-xs text-ink-500">{{ $meta['hint'] }}</p>
                 @endif
 
                 {{-- Ready-written text from the library. Placeholders are filled
@@ -82,7 +82,7 @@
                     <div class="mb-2 flex flex-wrap items-center gap-2">
                         <select
                             x-model="picked.{{ $field }}"
-                            aria-label="Premade text for {{ $label }}"
+                            aria-label="Premade text for {{ $meta['label'] }}"
                             class="max-w-xs rounded-lg border-ink-300 bg-white text-xs text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
                         >
                             <option value="">Insert premade text…</option>
@@ -125,48 +125,75 @@
                     </div>
                 @endif
 
-                <div
-                    class="grid gap-3"
-                    :style="`grid-template-columns: repeat(${locales.length}, minmax(0, 1fr))`"
-                >
-                    @foreach ($locales as $code => $meta)
-                        <div x-show="has('{{ $code }}')" x-cloak>
-                            <div class="mb-1 flex items-center gap-1.5">
-                                <span class="text-[0.65rem] font-semibold uppercase tracking-wider text-ink-400">
-                                    {{ $meta['label'] }}
-                                </span>
-                                <span
-                                    x-show="reviewed['{{ $code }}']"
-                                    x-cloak
-                                    class="rounded bg-warn-50 px-1.5 py-0.5 text-[0.6rem] font-medium text-warn-700"
-                                    title="Machine translated — read it before publishing"
-                                >review</span>
-                            </div>
+                @if ($meta['arabic'])
+                    {{-- One box, not one per language: the value is Arabic in
+                         every language, like the names. It posts under whichever
+                         language is default, which is bound rather than printed
+                         so changing the default here does not strand it. --}}
+                    <div class="max-w-xl">
+                        @if ($meta['rows'])
+                            <textarea
+                                :name="`{{ $meta['name'] }}[${def}]`"
+                                rows="{{ $meta['rows'] }}"
+                                dir="rtl"
+                                x-model="text['{{ $field }}'][def]"
+                                class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                            ></textarea>
+                        @else
+                            <input
+                                type="text"
+                                :name="`{{ $meta['name'] }}[${def}]`"
+                                dir="rtl"
+                                x-model="text['{{ $field }}'][def]"
+                                class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                            >
+                        @endif
+                    </div>
+                @else
+                    <div
+                        class="grid gap-3"
+                        :style="`grid-template-columns: repeat(${locales.length}, minmax(0, 1fr))`"
+                    >
+                        @foreach ($locales as $code => $lang)
+                            <div x-show="has('{{ $code }}')" x-cloak>
+                                <div class="mb-1 flex items-center gap-1.5">
+                                    <span class="text-[0.65rem] font-semibold uppercase tracking-wider text-ink-400">
+                                        {{ $lang['label'] }}
+                                    </span>
+                                    <span
+                                        x-show="reviewed['{{ $code }}']"
+                                        x-cloak
+                                        class="rounded bg-warn-50 px-1.5 py-0.5 text-[0.6rem] font-medium text-warn-700"
+                                        title="Machine translated — read it before publishing"
+                                    >review</span>
+                                </div>
 
-                            @if ($field === 'hosts')
-                                <textarea
-                                    name="{{ $field }}[{{ $code }}]"
-                                    id="{{ $field }}_{{ $code }}"
-                                    rows="3"
-                                    @if ($meta['rtl']) dir="rtl" @endif
-                                    x-model="text.{{ $field }}['{{ $code }}']"
-                                    class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                ></textarea>
-                            @else
-                                <input
-                                    type="text"
-                                    name="{{ $field }}[{{ $code }}]"
-                                    id="{{ $field }}_{{ $code }}"
-                                    @if ($meta['rtl']) dir="rtl" @endif
-                                    x-model="text.{{ $field }}['{{ $code }}']"
-                                    class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                                >
-                            @endif
-                        </div>
-                    @endforeach
-                </div>
+                                @if ($meta['rows'])
+                                    <textarea
+                                        name="{{ $meta['name'] }}[{{ $code }}]"
+                                        id="{{ $field }}_{{ $code }}"
+                                        rows="{{ $meta['rows'] }}"
+                                        @if ($lang['rtl']) dir="rtl" @endif
+                                        x-model="text['{{ $field }}']['{{ $code }}']"
+                                        class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                                    ></textarea>
+                                @else
+                                    <input
+                                        type="text"
+                                        name="{{ $meta['name'] }}[{{ $code }}]"
+                                        id="{{ $field }}_{{ $code }}"
+                                        @if ($lang['rtl']) dir="rtl" @endif
+                                        x-model="text['{{ $field }}']['{{ $code }}']"
+                                        class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                                    >
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
 
                 <x-ui.error :name="$field.'.*'" />
+                <x-ui.error :name="'content.'.$field.'.*'" />
             </div>
         @endforeach
     </div>

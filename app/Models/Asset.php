@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\BaseTemplates;
+use App\Support\ContentSlots;
 use App\Support\Placeholders;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -37,23 +38,33 @@ class Asset extends Model
         self::KIND_TEXT => 'Text',
     ];
 
+    /**
+     * How each kind introduces itself on the type picker, and what its section
+     * of the library is headed with.
+     *
+     * Held beside KINDS rather than in the view because three places need it —
+     * the picker, the library's section headings, and the empty state — and a
+     * fourth spelling of "Intro video" is how they drift apart.
+     *
+     * @var array<string, array{icon: string, blurb: string}>
+     */
+    public const KIND_META = [
+        self::KIND_VIDEO => [
+            'icon' => 'film',
+            'blurb' => 'The clip that plays when a guest opens the invitation.',
+        ],
+        self::KIND_MUSIC => [
+            'icon' => 'musical-note',
+            'blurb' => 'The track that plays underneath, once the guest taps.',
+        ],
+        self::KIND_TEXT => [
+            'icon' => 'document-text',
+            'blurb' => 'A verse, blessing or hosting line, with names filled in.',
+        ],
+    ];
+
     /** Kinds that hold a file rather than a body. */
     public const MEDIA_KINDS = [self::KIND_VIDEO, self::KIND_MUSIC];
-
-    /**
-     * What a text asset is meant for. Only a hint — the studio can insert any
-     * block into any field, since a blessing that was filed under "verse" is
-     * still a perfectly good hosting line.
-     *
-     * @var array<string, string>
-     */
-    public const TEXT_FIELDS = [
-        'verse' => 'Verse or blessing',
-        'hosts' => 'Hosting line',
-        'venue_name' => 'Venue',
-        'venue_city' => 'City',
-        'programme' => 'Programme step',
-    ];
 
     /** Where each kind's uploads live on the public disk. */
     public const DIRECTORIES = [
@@ -114,6 +125,25 @@ class Asset extends Model
             ->orderBy('name');
     }
 
+    /**
+     * What a text asset is meant for. Only a hint — the studio can insert any
+     * block into any field, since a blessing that was filed under "verse" is
+     * still a perfectly good hosting line.
+     *
+     * Derived from the core invitation fields plus every slot the base
+     * templates declare, rather than written out here. This used to be a hand
+     * kept list, and it drifted: it offered "verse" and "programme step" as
+     * places to file a block of text while the invitation form rendered
+     * neither, so the library let you write a verse and gave it nowhere to go.
+     * A list computed from what designs actually declare cannot say that.
+     *
+     * @return array<string, string>
+     */
+    public static function textFields(): array
+    {
+        return ContentSlots::all();
+    }
+
     /* ── kind ─────────────────────────────────────────────────────── */
 
     public function isMedia(): bool
@@ -129,6 +159,11 @@ class Asset extends Model
     public function kindLabel(): string
     {
         return self::KINDS[$this->kind] ?? $this->kind;
+    }
+
+    public function kindIcon(): string
+    {
+        return self::KIND_META[$this->kind]['icon'] ?? 'rectangle-stack';
     }
 
     /** Public disk directory for this asset's uploads. */
@@ -158,7 +193,7 @@ class Asset extends Model
 
     public function fieldLabel(): ?string
     {
-        return $this->field ? (self::TEXT_FIELDS[$this->field] ?? $this->field) : null;
+        return $this->field ? (self::textFields()[$this->field] ?? $this->field) : null;
     }
 
     public function isRtl(): bool

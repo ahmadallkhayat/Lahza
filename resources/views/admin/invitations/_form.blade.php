@@ -2,18 +2,56 @@
     $local = $invitation->exists ? $invitation->startsAtLocal() : null;
     $localeMeta = config('templates.locales');
     $codes = array_keys($localeMeta);
-    $translatable = ['hosts', 'venue_name', 'venue_city'];
 
     $selected = array_values(array_intersect($codes, (array) old('locales', $invitation->localeList()))) ?: ['ar'];
 
     $default = old('default_locale', $invitation->exists ? $invitation->defaultLocale() : 'ar');
     $default = in_array($default, $selected, true) ? $default : $selected[0];
 
+    /* ── what this invitation can say ─────────────────────────────────
+       The core fields every design shares, plus the slots the chosen design
+       declares in its template.php. Written as one list so the card, the
+       library pickers and the translate button all iterate the same thing —
+       which is what stops a field existing in one of them and not the others.
+
+       Slots follow the theme selected when the page was rendered. Switching to
+       a theme built on a different design shows its slots after saving, since
+       only the server knows what that design declares. */
+    $chosen = $templates->firstWhere('id', (int) old('template_id', $invitation->template_id))
+        ?? $templates->first();
+
+    $contentFields = [
+        'hosts' => ['label' => 'Hosting line', 'hint' => 'The families extending the invitation.', 'rows' => 3],
+        'venue_name' => ['label' => 'Venue'],
+        'venue_city' => ['label' => 'City'],
+    ];
+
+    foreach ($contentFields as $key => $meta) {
+        $contentFields[$key] = $meta + ['name' => $key, 'arabic' => false, 'hint' => null, 'rows' => null];
+    }
+
+    foreach (\App\Support\ContentSlots::for($chosen?->base_template) as $key => $meta) {
+        $contentFields[$key] = [
+            'label' => $meta['label'] ?? $key,
+            'hint' => $meta['hint'] ?? null,
+            'rows' => $meta['rows'] ?? null,
+            'arabic' => (bool) ($meta['arabic'] ?? false),
+            'name' => "content[$key]",
+        ];
+    }
+
+    // Translation covers the per-language fields only. An Arabic-everywhere
+    // slot is one value in every language by definition, so running the verse
+    // through a machine translator would be actively wrong.
+    $translatable = array_keys(array_filter($contentFields, fn ($f) => ! $f['arabic']));
+
     // Every language gets a slot whether or not it is ticked, so text typed
     // into one, unticked and reticked, is still there.
-    $text = collect($translatable)
-        ->mapWithKeys(fn ($field) => [$field => collect($codes)
-            ->mapWithKeys(fn ($c) => [$c => (string) old("$field.$c", data_get($invitation->{$field}, $c, ''))])
+    $text = collect($contentFields)
+        ->mapWithKeys(fn ($meta, $field) => [$field => collect($codes)
+            ->mapWithKeys(fn ($c) => [$c => (string) ($meta['name'] === $field
+                ? old("$field.$c", data_get($invitation->{$field}, $c, ''))
+                : old("content.$field.$c", data_get($invitation->content, "$field.$c", '')))])
             ->all(),
         ])
         ->all();
@@ -78,8 +116,9 @@
         'assets' => $assetOptions,
         'placeholders' => \App\Support\Placeholders::aliases(),
         'meridiem' => $meridiem,
-        'picked' => array_fill_keys($translatable, ''),
-        'notes' => array_fill_keys($translatable, ''),
+        'arabicFields' => array_keys(array_filter($contentFields, fn ($f) => $f['arabic'])),
+        'picked' => array_fill_keys(array_keys($contentFields), ''),
+        'notes' => array_fill_keys(array_keys($contentFields), ''),
     ]))"
 >
 

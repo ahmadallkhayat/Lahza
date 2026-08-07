@@ -28,6 +28,10 @@ export default function invitationForm(config) {
         placeholders: config.placeholders,
         meridiem: config.meridiem,
 
+        // Slots whose value is Arabic in every language, so the form gives
+        // them one box rather than one per language.
+        arabicFields: config.arabicFields ?? [],
+
         picked: config.picked,
         assetNote: config.notes,
 
@@ -267,7 +271,12 @@ export default function invitationForm(config) {
             const asset = this.assets.find(a => String(a.id) === String(id));
             if (! asset) return;
 
-            const target = asset.locale && this.has(asset.locale) ? asset.locale : this.def;
+            // An Arabic-everywhere slot has one box, held under the default
+            // language — so a block filed as Arabic still lands in it rather
+            // than in a column that field does not have.
+            const target = this.arabicFields.includes(field)
+                ? this.def
+                : (asset.locale && this.has(asset.locale) ? asset.locale : this.def);
 
             this.text[field][target] = this.resolveText(asset.body, target);
 

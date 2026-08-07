@@ -39,9 +39,16 @@ class AssetController extends Controller
             ->get();
 
         return view('admin.assets.index', [
-            // Grouped so the page reads as one library per design, which is how
-            // the studio thinks about them.
-            'groups' => $assets->groupBy(fn (Asset $asset) => $asset->baseTemplateLabel()),
+            // Grouped by kind: clips, tracks and text are different things that
+            // happen to share a table, and a section each is how the library
+            // gets read. Which design an asset belongs to is a property of the
+            // row, shown in its own column, not a reason to split the page.
+            //
+            // Sorted into KINDS order rather than whatever the rows arrived in,
+            // so the sections do not reshuffle as the library fills up.
+            'groups' => $assets
+                ->groupBy('kind')
+                ->sortBy(fn ($rows, $kind) => array_search($kind, array_keys(Asset::KINDS), true)),
             'baseTemplates' => BaseTemplates::available(),
             'base' => $base,
             'kind' => $kind,
@@ -54,8 +61,11 @@ class AssetController extends Controller
         $kind = (string) $request->query('kind');
 
         return view('admin.assets.create', [
+            // No kind by default. Choosing what this is comes first, and the
+            // rest of the form follows from it — defaulting to text put the
+            // studio in the middle of one answer before it had been asked.
             'asset' => new Asset([
-                'kind' => array_key_exists($kind, Asset::KINDS) ? $kind : Asset::KIND_TEXT,
+                'kind' => array_key_exists($kind, Asset::KINDS) ? $kind : '',
                 'base_template' => $request->query('base') ?: null,
                 'is_active' => true,
             ]),

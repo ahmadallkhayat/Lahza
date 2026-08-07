@@ -1,8 +1,13 @@
-{{-- The library, one section per design.
+{{-- The library, one section per kind.
 
-     Grouped rather than filtered by default because the point of the page is
-     seeing what a design has to build with. The filters narrow it when a
-     library gets long. --}}
+     Clips, tracks and text are different things that happen to share a table,
+     so each gets its own section. Which design an asset belongs to is a
+     property of the row, not a reason to split the page — it reads in the
+     Library column. The filters narrow both axes when the library gets long. --}}
+
+@php
+    use App\Models\Asset;
+@endphp
 
 <x-layouts.admin title="Assets">
     <x-ui.page-header
@@ -10,16 +15,13 @@
         description="Clips, music and ready-written text, reusable across templates and invitations."
     >
         <x-slot:actions>
+            {{-- One way in. The kind is chosen on the next page, where it is a
+                 question with room to explain itself rather than two buttons
+                 that quietly split the library in half. --}}
             <x-ui.button
-                :href="route('admin.assets.create', array_filter(['kind' => 'text', 'base' => $base !== 'shared' ? $base : null]))"
-                variant="secondary"
-                icon="document-text"
-            >New text</x-ui.button>
-
-            <x-ui.button
-                :href="route('admin.assets.create', array_filter(['kind' => 'video', 'base' => $base !== 'shared' ? $base : null]))"
+                :href="route('admin.assets.create', array_filter(['base' => $base !== 'shared' ? $base : null]))"
                 icon="plus"
-            >New media</x-ui.button>
+            >New asset</x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
@@ -41,7 +43,7 @@
                 <x-ui.field label="Kind" name="kind" class="w-full sm:w-48">
                     <x-ui.select name="kind" onchange="this.form.submit()">
                         <option value="">Every kind</option>
-                        @foreach (\App\Models\Asset::KINDS as $value => $label)
+                        @foreach (Asset::KINDS as $value => $label)
                             <option value="{{ $value }}" @selected($kind === $value)>{{ $label }}</option>
                         @endforeach
                     </x-ui.select>
@@ -67,20 +69,48 @@
                     @if ($total > 0)
                         <x-ui.button :href="route('admin.assets.index')" variant="secondary">Clear filters</x-ui.button>
                     @else
-                        <x-ui.button :href="route('admin.assets.create', ['kind' => 'video'])" icon="plus">New media</x-ui.button>
-                        <x-ui.button :href="route('admin.assets.create', ['kind' => 'text'])" variant="secondary" icon="document-text">New text</x-ui.button>
+                        <x-ui.button :href="route('admin.assets.create')" icon="plus">New asset</x-ui.button>
                     @endif
                 </x-slot:actions>
             </x-ui.empty>
         </x-ui.card>
     @else
         <div class="space-y-6">
-            @foreach ($groups as $label => $assets)
-                <x-ui.card :title="$label" :description="$assets->count().' '.Str::plural('asset', $assets->count())" padded="false">
+            @foreach ($groups as $kindKey => $assets)
+                @php($meta = Asset::KIND_META[$kindKey] ?? ['icon' => 'rectangle-stack', 'blurb' => ''])
+
+                <x-ui.card padded="false">
+                    {{-- Written out rather than passed as :title, so the section
+                         heading can carry its icon and its count. --}}
+                    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-ink-200 px-5 py-4">
+                        <div class="flex min-w-0 items-center gap-2.5">
+                            <x-dynamic-component
+                                :component="'heroicon-o-'.$meta['icon']"
+                                class="h-4 w-4 shrink-0 text-ink-400"
+                            />
+                            <h2 class="text-sm font-semibold text-ink-900">
+                                {{ Asset::KINDS[$kindKey] ?? $kindKey }}
+                            </h2>
+                            <span class="text-xs text-ink-500">
+                                {{ $assets->count() }} {{ Str::plural('asset', $assets->count()) }}
+                            </span>
+                        </div>
+
+                        <x-ui.button
+                            :href="route('admin.assets.create', array_filter([
+                                'kind' => $kindKey,
+                                'base' => $base !== 'shared' ? $base : null,
+                            ]))"
+                            variant="ghost"
+                            size="sm"
+                            icon="plus"
+                        >Add</x-ui.button>
+                    </div>
+
                     <x-ui.table>
                         <x-slot:head>
                             <x-ui.th>Name</x-ui.th>
-                            <x-ui.th>Kind</x-ui.th>
+                            <x-ui.th>Library</x-ui.th>
                             <x-ui.th>Preview</x-ui.th>
                             <x-ui.th>Status</x-ui.th>
                             <x-ui.th class="text-end">Actions</x-ui.th>
@@ -98,20 +128,25 @@
                                     @endif
                                 </x-ui.td>
 
+                                {{-- Which design owns this, plus the qualifiers
+                                     that used to sit under the kind badge. The
+                                     kind itself is the section heading now. --}}
                                 <x-ui.td>
                                     <div class="flex flex-wrap items-center gap-1.5">
-                                        <x-ui.badge tone="neutral">{{ $asset->kindLabel() }}</x-ui.badge>
+                                        <x-ui.badge :tone="$asset->base_template === null ? 'neutral' : 'brand'">
+                                            {{ $asset->base_template === null ? 'Shared — all templates' : $asset->baseTemplateLabel() }}
+                                        </x-ui.badge>
                                         @if ($asset->localeLabel())
-                                            <x-ui.badge tone="brand">{{ $asset->localeLabel() }}</x-ui.badge>
+                                            <span class="text-xs text-ink-500">{{ $asset->localeLabel() }}</span>
                                         @endif
                                         @if ($asset->fieldLabel())
-                                            <span class="text-xs text-ink-500">{{ $asset->fieldLabel() }}</span>
+                                            <span class="text-xs text-ink-500">· {{ $asset->fieldLabel() }}</span>
                                         @endif
                                     </div>
                                 </x-ui.td>
 
                                 <x-ui.td>
-                                    @if ($asset->kind === \App\Models\Asset::KIND_VIDEO && $asset->path)
+                                    @if ($asset->kind === Asset::KIND_VIDEO && $asset->path)
                                         {{-- Muted, metadata only: a library page must not
                                              pull a dozen full clips down to draw a list. --}}
                                         <video
@@ -121,7 +156,7 @@
                                             playsinline
                                             preload="metadata"
                                         ></video>
-                                    @elseif ($asset->kind === \App\Models\Asset::KIND_MUSIC && $asset->path)
+                                    @elseif ($asset->kind === Asset::KIND_MUSIC && $asset->path)
                                         <audio src="{{ $asset->path }}" class="w-56 max-w-full" controls preload="none"></audio>
                                     @elseif ($asset->isText())
                                         <p

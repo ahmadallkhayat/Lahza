@@ -85,7 +85,7 @@ class AssetRequest extends FormRequest
         // runs long, and this is the one field with no other ceiling on it.
         $rules['body'] = ['required', 'string', 'max:4000'];
         $rules['locale'] = ['nullable', Rule::in(array_keys(config('templates.locales')))];
-        $rules['field'] = ['nullable', Rule::in(array_keys(Asset::TEXT_FIELDS))];
+        $rules['field'] = ['nullable', Rule::in(array_keys(Asset::textFields()))];
 
         return $rules;
     }

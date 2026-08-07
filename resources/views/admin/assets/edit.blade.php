@@ -21,11 +21,6 @@
         @csrf
         @method('PUT')
 
-        @include('admin.assets._form')
-
-        <div class="flex items-center gap-3">
-            <x-ui.button type="submit">Save changes</x-ui.button>
-            <x-ui.button :href="route('admin.assets.index')" variant="ghost">Cancel</x-ui.button>
-        </div>
+        @include('admin.assets._form', ['submitLabel' => 'Save changes'])
     </form>
 </x-layouts.admin>

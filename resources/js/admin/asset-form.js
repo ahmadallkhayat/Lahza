@@ -23,6 +23,16 @@ export default function assetForm(config) {
 
         rtl: config.rtl,
 
+        /**
+         * Whether the type question has been answered. On create it starts
+         * unanswered and the rest of the form waits, because every field below
+         * it belongs to one kind or the other. On edit the kind is fixed, so
+         * this is true from the first paint.
+         */
+        get hasKind() {
+            return this.kind !== '' && this.kind != null;
+        },
+
         get isMedia() {
             return this.kind === 'video' || this.kind === 'music';
         },

@@ -7,7 +7,10 @@
     // On edit the kind is fixed: a video row holds a file and no body, and
     // letting it become text would orphan the upload and leave any template
     // that picked it pointing at nothing. The request enforces this too.
-    $kind = old('kind', $asset->kind ?: Asset::KIND_TEXT);
+    //
+    // On create it starts empty. Choosing what this is comes first, and the
+    // rest of the form is written for that answer.
+    $kind = old('kind', $asset->kind ?: '');
 @endphp
 
 {{-- x-data goes on a plain wrapper, not on the card component: Blade compiles
@@ -25,10 +28,56 @@
     ]))"
 >
 
+{{-- ── Type ─────────────────────────────────────────────────────────
+     The first question, and on create the only one until it is answered:
+     everything below is written for one kind or the other. Tiles rather than
+     a dropdown because each option needs a sentence to distinguish it, and
+     because this is the choice the whole page turns on. --}}
+@if (! $asset->exists)
+    <x-ui.card title="Type" description="What kind of asset this is. Fixed once created.">
+        <fieldset>
+            <legend class="sr-only">Asset type</legend>
+
+            <div class="grid gap-3 sm:grid-cols-3">
+                @foreach (Asset::KINDS as $value => $label)
+                    @php($meta = Asset::KIND_META[$value])
+                    <label
+                        class="flex cursor-pointer flex-col gap-1.5 rounded-lg border p-4 transition-colors"
+                        :class="kind === '{{ $value }}'
+                            ? 'border-brand-500 bg-brand-50/50 ring-1 ring-brand-500'
+                            : 'border-ink-200 hover:border-ink-300 hover:bg-ink-50'"
+                    >
+                        {{-- The radio itself carries the value and the keyboard
+                             behaviour; only its rendering is replaced. --}}
+                        <input type="radio" name="kind" value="{{ $value }}" x-model="kind" class="sr-only">
+
+                        <span class="flex items-center gap-2">
+                            <x-dynamic-component
+                                :component="'heroicon-o-'.$meta['icon']"
+                                class="h-4 w-4 shrink-0"
+                                ::class="kind === '{{ $value }}' ? 'text-brand-600' : 'text-ink-400'"
+                            />
+                            <span class="text-sm font-medium text-ink-900">{{ $label }}</span>
+                        </span>
+
+                        <span class="text-xs leading-relaxed text-ink-500">{{ $meta['blurb'] }}</span>
+                    </label>
+                @endforeach
+            </div>
+        </fieldset>
+
+        <x-ui.error name="kind" />
+    </x-ui.card>
+@endif
+
+{{-- Everything from here is written for the chosen kind, so on create it waits
+     for that choice rather than presenting fields that may not apply. --}}
+<div x-show="hasKind" x-cloak class="space-y-6">
+
 <x-ui.card title="Asset" description="What this is, and which design's library it belongs to.">
     <div class="grid gap-5 sm:grid-cols-2">
-        <x-ui.field label="Kind" name="kind" required>
-            @if ($asset->exists)
+        @if ($asset->exists)
+            <x-ui.field label="Kind" name="kind">
                 {{-- Shown, not editable. Posted as a hidden field so the form
                      round-trips, though the request ignores it on update. --}}
                 <div class="flex h-[38px] items-center gap-2">
@@ -36,13 +85,11 @@
                     <span class="text-xs text-ink-500">Fixed once created.</span>
                 </div>
                 <input type="hidden" name="kind" value="{{ $asset->kind }}">
-            @else
-                <x-ui.select name="kind" x-model="kind" required>
-                    @foreach (Asset::KINDS as $value => $label)
-                        <option value="{{ $value }}" @selected($kind === $value)>{{ $label }}</option>
-                    @endforeach
-                </x-ui.select>
-            @endif
+            </x-ui.field>
+        @endif
+
+        <x-ui.field label="Name" name="name" required hint="What the dropdowns will show.">
+            <x-ui.input name="name" :value="old('name', $asset->name)" required placeholder="Ring box opening" />
         </x-ui.field>
 
         <x-ui.field
@@ -58,11 +105,7 @@
             </x-ui.select>
         </x-ui.field>
 
-        <x-ui.field label="Name" name="name" required hint="What the dropdowns will show.">
-            <x-ui.input name="name" :value="old('name', $asset->name)" required placeholder="Ring box opening" />
-        </x-ui.field>
-
-        <x-ui.field label="Note" name="description" hint="Optional. Only ever seen here.">
+        <x-ui.field label="Note" name="description" hint="Optional. Only ever seen here." class="sm:col-span-2">
             <x-ui.input name="description" :value="old('description', $asset->description)" />
         </x-ui.field>
 
@@ -161,7 +204,7 @@
                 >
                     <x-ui.select name="field">
                         <option value="">Anything</option>
-                        @foreach (Asset::TEXT_FIELDS as $value => $label)
+                        @foreach (Asset::textFields() as $value => $label)
                             <option value="{{ $value }}" @selected(old('field', $asset->field) === $value)>{{ $label }}</option>
                         @endforeach
                     </x-ui.select>
@@ -229,6 +272,16 @@
             x-text="preview || 'Nothing written yet.'"
         ></p>
     </x-ui.card>
+</div>
+
+{{-- Inside the gate, so there is nothing to submit before a type is chosen —
+     and inside the Alpine component, which is why the actions live here rather
+     than in the create and edit pages that include this. --}}
+<div class="flex items-center gap-3">
+    <x-ui.button type="submit">{{ $submitLabel }}</x-ui.button>
+    <x-ui.button :href="route('admin.assets.index')" variant="ghost">Cancel</x-ui.button>
+</div>
+
 </div>
 
 </div>

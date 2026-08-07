@@ -54,7 +54,12 @@
     };
 
     $programme = $invitation->programmeRows();
-    $verseTranslation = trim(__('invitation.verse_translation'));
+    // Slots this design declares in its template.php. Each is the
+    // invitation's own wording where it gave one, and the design's default
+    // where it did not — so nothing here has to know which it got.
+    $verse = trim($invitation->slot('verse'));
+    $verseTranslation = trim($invitation->slot('verse_translation'));
+    $verseRef = trim($invitation->slot('verse_ref'));
 @endphp
 <!DOCTYPE html>
 <html lang="{{ $locale }}" dir="{{ $rtl ? 'rtl' : 'ltr' }}">
@@ -484,13 +489,15 @@ footer {
 
 <main id="content">
 
-    @if ($invitation->show_verse)
+    @if ($invitation->show_verse && $verse !== '')
         <section class="verse">
-            <p class="verse-ar" lang="ar" dir="rtl">{{ __('invitation.verse') }}</p>
+            <p class="verse-ar" lang="ar" dir="rtl">{{ $verse }}</p>
             @if ($verseTranslation !== '')
                 <p class="verse-en">{{ $verseTranslation }}</p>
             @endif
-            <cite>{{ __('invitation.verse_ref') }}</cite>
+            @if ($verseRef !== '')
+                <cite>{{ $verseRef }}</cite>
+            @endif
         </section>
     @endif
 

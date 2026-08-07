@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ContentSlots;
 use App\Support\Numerals;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -41,6 +42,7 @@ class Invitation extends Model
         'map_url',
         'phone',
         'programme',
+        'content',
         'show_verse',
         'published',
     ];
@@ -51,6 +53,7 @@ class Invitation extends Model
         'venue_name' => 'array',
         'venue_city' => 'array',
         'programme' => 'array',
+        'content' => 'array',
         'show_verse' => 'boolean',
         'published' => 'boolean',
         'duration_hours' => 'integer',
@@ -150,6 +153,38 @@ class Invitation extends Model
             ?? Arr::first(array_filter($values, fn ($v) => filled($v)));
 
         return filled($value) ? $value : null;
+    }
+
+    /**
+     * A slot declared by this invitation's base template.
+     *
+     * Empty means "use the design's own wording", not "blank" — so an
+     * invitation that says nothing about its verse still shows one. That is
+     * why this returns the manifest default rather than null: a slot with a
+     * default is a field the design has already answered, and the studio is
+     * only ever overriding it.
+     *
+     * Slots marked `arabic` are stored once under the default locale, like the
+     * names, since the value is the same in every language.
+     */
+    public function slot(string $key, ?string $locale = null): string
+    {
+        $base = $this->template?->base_template;
+        $locale ??= $this->locale();
+
+        $values = (array) (($this->content ?? [])[$key] ?? []);
+
+        // No borrowing across languages here, unlike text(). A slot always has
+        // the design's own wording to fall back on, so a language left empty
+        // has something correct to show — whereas lending it another
+        // language's value puts "QURAN 30:21" under an Arabic verse.
+        $value = ContentSlots::isArabicEverywhere($base, $key)
+            ? Arr::first(array_filter($values, fn ($v) => filled($v)))
+            : ($values[$locale] ?? null);
+
+        return filled($value)
+            ? (string) $value
+            : ContentSlots::default($base, $key, $locale);
     }
 
     /**
