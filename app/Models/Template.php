@@ -16,6 +16,18 @@ class Template extends Model
         'keepVideoAudioMs' => 0,
         'musicFadeMs' => 1600,
         'fadeOutLeadMs' => 800,
+
+        // How long before the clip ends the names appear. Larger than
+        // fadeOutLeadMs on purpose: the difference is how long the names have
+        // the video to themselves before it starts dissolving.
+        'namesLeadMs' => 2600,
+
+        // Playback rate of the blurred backdrop loop. Slow enough to read as
+        // drift rather than footage.
+        'ambientRate' => 0.35,
+
+        // How long petals keep falling after the reveal before thinning out.
+        'petalsMs' => 22000,
         'crossfadeMs' => 1400,
         'duckTo' => 0.42,
         'fogHz' => 700,
@@ -40,6 +52,7 @@ class Template extends Model
         'base_template',
         'description',
         'intro_video',
+        'ambient_video',
         'music',
         'palette',
         'settings',

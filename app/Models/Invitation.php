@@ -294,6 +294,27 @@ class Invitation extends Model
         return $clock.' '.$meridiem;
     }
 
+    /**
+     * When it finishes, in the same shape as the start time.
+     *
+     * Null when the end lands on a later day. "7:00 – 1:00" reads as a
+     * twelve-hour error rather than a wedding that ran past midnight, and the
+     * page has nowhere to put the extra day.
+     */
+    public function formattedEndTime(): ?string
+    {
+        $start = $this->startsAtLocal();
+        $end = $start->addHours($this->duration_hours ?: 0);
+
+        if ($this->duration_hours <= 0 || ! $end->isSameDay($start)) {
+            return null;
+        }
+
+        $clock = Numerals::localise($end->format('g:i'), $this->locale());
+
+        return $clock.' '.__($end->hour < 12 ? 'invitation.am' : 'invitation.pm');
+    }
+
     /** Latin names only appear beneath the Arabic on English invitations. */
     public function showsLatinNames(): bool
     {

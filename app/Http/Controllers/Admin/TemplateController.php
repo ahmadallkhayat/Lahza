@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\TemplateRequest;
 use App\Models\Asset;
 use App\Models\Template;
+use App\Services\AmbientVideoEncoder;
 use App\Services\VideoPaletteExtractor;
 use App\Support\BaseTemplates;
 use App\Support\MediaStore;
@@ -48,6 +49,7 @@ class TemplateController extends Controller
             ?? $this->selectedAsset($request, 'music_asset')?->path;
 
         $note = $this->maybeDerivePalette($request, $data, $data['intro_video']);
+        $data['ambient_video'] = $this->ambient($data['intro_video']);
 
         $template = Template::create($data);
 
@@ -80,6 +82,13 @@ class TemplateController extends Controller
 
         $note = $this->maybeDerivePalette($request, $data, $videoUrl);
 
+        // Only when the clip itself changed. Re-encoding on every save would
+        // spend a minute of ffmpeg to rename a template.
+        if ($videoUrl !== $template->intro_video) {
+            app(AmbientVideoEncoder::class)->forget($template->ambient_video);
+            $data['ambient_video'] = $this->ambient($videoUrl);
+        }
+
         $template->update($data);
 
         return back()->with('status', trim('Template updated. '.$note));
@@ -97,6 +106,7 @@ class TemplateController extends Controller
         }
 
         $this->releaseMedia($template->intro_video);
+        app(AmbientVideoEncoder::class)->forget($template->ambient_video);
         $this->releaseMedia($template->music);
 
         $template->delete();
@@ -253,6 +263,20 @@ class TemplateController extends Controller
         $data['palette'] = $derived;
 
         return 'Colours were read from the intro video.';
+    }
+
+    /**
+     * The backdrop loop for a clip, or null when one cannot be made.
+     *
+     * Never fatal: ffmpeg may be absent, the clip may be too long to reverse.
+     * The design blurs the intro clip in place instead, so a null here costs
+     * the refraction some of its movement and nothing else.
+     */
+    private function ambient(?string $videoUrl): ?string
+    {
+        return filled($videoUrl)
+            ? app(AmbientVideoEncoder::class)->encode($videoUrl)
+            : null;
     }
 
     private function uniqueSlug(string $name): string

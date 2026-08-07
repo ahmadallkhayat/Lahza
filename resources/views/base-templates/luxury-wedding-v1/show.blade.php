@@ -53,6 +53,35 @@
         default => "'Cairo', system-ui, sans-serif",
     };
 
+    /* ── Falling petals ───────────────────────────────────────────────
+       The shape is a mask, not an image, so its colour comes from CSS and one
+       file serves every palette. Inlined as a data URI to keep it a single
+       request and to let the swap be nothing more than replacing the file.
+
+       Tints are drawn from the palette rather than picked freely: these fall
+       over a theme whose colours came from the couple's own video, and anything
+       chosen outside that clashes with it. */
+    $petalSvg = resource_path('svg/petal.svg');
+    $petal = file_exists($petalSvg)
+        ? 'data:image/svg+xml;base64,'.base64_encode(file_get_contents($petalSvg))
+        : null;
+
+    $petalTints = ['gold', 'gold_deep', 'paper_deep', 'ink_soft'];
+
+    // Randomised per render, so no two openings drift the same way. Seeded by
+    // nothing on purpose — the variation is the point, not reproducibility.
+    $petals = collect(range(0, 25))->map(fn ($i) => [
+        'x' => mt_rand(-4, 104),
+        'size' => mt_rand(9, 20),
+        'dur' => mt_rand(11, 24),
+        // Negative delays start the drift mid-fall, so the first frame already
+        // has petals in the air rather than a row of them waiting at the top.
+        'delay' => -mt_rand(0, 22),
+        'tint' => $petalTints[$i % count($petalTints)],
+        'drift' => mt_rand(8, 22) / 10,
+        'spin' => mt_rand(14, 40),
+    ]);
+
     $programme = $invitation->programmeRows();
     // Slots this design declares in its template.php. Each is the
     // invitation's own wording where it gave one, and the design's default
@@ -121,18 +150,77 @@ body {
   overflow-x: hidden;
 }
 
+/* Nothing scrolls until the invitation is actually there to read.
+   Scrolling behind the curtain showed the whole page through it and gave the
+   reveal away. Both elements carry it because iOS Safari honours it on one and
+   not the other depending on version, and touch-action stops the rubber band
+   that slips through anyway. */
+html.held, html.held body {
+  overflow: hidden;
+  height: 100%;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
+  /* Behind the content but above the clip, so the wash tints the video too. */
+  z-index: -1;
   background:
     radial-gradient(120% 80% at 50% 0%,   color-mix(in srgb, var(--gold) 28%, transparent), transparent 60%),
     radial-gradient(100% 70% at 50% 100%, color-mix(in srgb, var(--gold) 14%, transparent), transparent 65%);
 }
 
-/* ─── INTRO ──────────────────────────────────────────────────── */
+/* ─── BACKDROP ───────────────────────────────────────────────────
+   The lowest layer in the root stacking context. Everything above it can
+   blend against it, which is the whole reason it is not inside the curtain. */
+#backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  background: var(--curtain);
+}
+
+#backdrop video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The intro plays sharp, then hands over. */
+#intro { opacity: 0; transition: opacity var(--fade) ease, filter var(--fade) ease; }
+#intro.playing { opacity: 1; }
+
+/* Slowed by playbackRate rather than CSS, blurred here. Scaled up so the blur
+   has material to bleed from and cannot show a soft edge at the viewport. */
+#ambient {
+  opacity: 0;
+  transform: scale(1.15);
+  filter: blur(26px) saturate(1.15);
+  transition: opacity 1.6s ease;
+}
+#ambient.on { opacity: .5; }
+
+/* When there is no separate ambient encode the intro clip stays on as one,
+   blurred in place — the effect matters more than which file it came from. */
+#intro.ambient {
+  filter: blur(26px) saturate(1.15);
+  transform: scale(1.15);
+  opacity: .5;
+}
+
+/* ─── INTRO ────────────────────────────────────────────────────
+   The curtain is now only a scrim and a prompt — the clip moved to #backdrop.
+   So it has two stages rather than one: on tap its fill clears, uncovering the
+   video already playing beneath it, and it keeps blocking touches until the
+   reveal. Leaving it opaque until then, as it was, meant the clip played behind
+   a solid panel and was never seen. */
 #curtain {
   position: fixed;
   inset: 0;
@@ -141,22 +229,10 @@ body::before {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: opacity var(--fade) ease;
+  transition: background-color var(--fade) ease, opacity var(--fade) ease;
 }
+#curtain.opened { background-color: transparent; }
 #curtain.gone { opacity: 0; pointer-events: none; }
-
-#intro {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  /* 16:9 footage on a portrait phone: cover crops the sides. Centred
-     subjects survive it; switch to `contain` to letterbox instead. */
-  object-fit: cover;
-  opacity: 0;
-  transition: opacity 600ms ease;
-}
-#intro.playing { opacity: 1; }
 
 #prompt { position: relative; z-index: 2; text-align: center; transition: opacity 500ms ease; }
 #prompt.gone { opacity: 0; }
@@ -194,34 +270,183 @@ body::before {
 }
 
 /* ─── CONTENT ────────────────────────────────────────────────── */
+/* No z-index here on purpose. `position: relative` alone creates no stacking
+   context, which is what lets the names inside blend against the clip two
+   layers down. Adding one would silently kill the effect. */
 main {
   position: relative;
-  z-index: 1;
   max-width: var(--shell);
   margin: 0 auto;
   padding: clamp(3rem, 9vh, 5.5rem) 1.6rem 4.5rem;
   text-align: center;
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity var(--fade) ease, transform var(--fade) ease;
 }
-main.revealed { opacity: 1; transform: none; }
 
-main.revealed > * { animation: rise 1s ease both; }
-main.revealed > *:nth-child(1) { animation-delay: .15s; }
-main.revealed > *:nth-child(2) { animation-delay: .30s; }
-main.revealed > *:nth-child(3) { animation-delay: .45s; }
-main.revealed > *:nth-child(4) { animation-delay: .60s; }
-main.revealed > *:nth-child(5) { animation-delay: .75s; }
-main.revealed > *:nth-child(6) { animation-delay: .90s; }
-main.revealed > *:nth-child(7) { animation-delay: 1.05s; }
-main.revealed > *:nth-child(8) { animation-delay: 1.20s; }
+/* Every section waits, including the names — they are simply released first,
+   and in place, so nothing ever moves between the two phases. */
+main > * {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 900ms ease, transform 900ms ease;
+}
+
+/* Phase one: the names alone, over the still-running clip. */
+main.names-in .couple-section { opacity: 1; transform: none; }
+
+/* Phase two: the rest, staggered. The step is set per element from one place
+   rather than a rule per position — the old nth-child(1..8) list meant a ninth
+   section silently got no delay at all, and nobody would notice until it sat
+   there motionless among eight that moved. */
+main.revealed > * {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--i, 0) * 150ms);
+}
+
 @keyframes rise {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: none; }
 }
 
-section { margin-block: 2.9rem; }
+/* The end time, quieter than the start it follows. */
+.at-time .until { color: var(--ink-soft); }
+
+/* ─── SCROLL CUE ─────────────────────────────────────────────────
+   The invitation runs well past one screen and nothing said so, which on a
+   phone means the names and the date can read as the whole of it. Fades out on
+   the first scroll — a cue that stays after being acted on is just decoration. */
+#more {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 1.1rem;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  gap: .3rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 900ms ease;
+}
+#more.on { opacity: .75; }
+
+#more svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke: var(--gold-deep);
+  stroke-width: 1.5;
+  fill: none;
+  animation: nudge 2.2s ease-in-out infinite;
+}
+
+@keyframes nudge {
+  0%, 100% { transform: translateY(0); opacity: .55; }
+  50%      { transform: translateY(5px); opacity: 1; }
+}
+
+/* ─── PETALS ─────────────────────────────────────────────────────
+   Above the invitation, below the curtain, and untouchable. They start with the
+   reveal and thin out after it: continuous fall is livelier for the first look,
+   but it never stops being motion in the corner of the eye, and someone reading
+   a programme should not be doing it in weather. */
+#petals {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 2.4s ease;
+}
+#petals.on { opacity: 1; }
+
+.petal {
+  position: absolute;
+  top: calc(var(--size) * -2);
+  left: var(--x);
+  width: var(--size);
+  height: var(--size);
+  animation: fall var(--dur) linear var(--delay) infinite;
+  will-change: transform;
+}
+
+/* The mask is what makes one file work in every colour: the shape comes from
+   the SVG, the colour from `background`. As an <img> it would need a copy per
+   tint, and the tints come from a palette that is different per template. */
+.petal i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--tint);
+  opacity: .5;
+  -webkit-mask: url('{{ $petal }}') center / contain no-repeat;
+  mask: url('{{ $petal }}') center / contain no-repeat;
+  animation: sway calc(var(--dur) / 3) ease-in-out var(--delay) infinite alternate;
+  will-change: transform;
+}
+
+@keyframes fall {
+  from { transform: translateY(0); }
+  to   { transform: translateY(115vh); }
+}
+
+@keyframes sway {
+  from { transform: translateX(calc(var(--drift) * -1)) rotate(calc(var(--spin) * -1)); }
+  to   { transform: translateX(var(--drift)) rotate(var(--spin)); }
+}
+
+/* ─── GLASS ──────────────────────────────────────────────────────
+   Each section is a pane over the drifting backdrop. The movement is meant to
+   be felt rather than watched, which is the whole reason the loop is blurred to
+   26px and slowed to a third speed: at full strength it reads as a video with
+   text on top, not as glass.
+
+   The fill is `paper` at 72%, and that number is load-bearing. Every colour in
+   a generated palette is contrast-checked against solid `paper`, and a moving
+   image behind text voids that guarantee — whatever frame is passing decides
+   the ratio. Keeping the pane mostly paper holds the measured contrast to
+   within a few percent of what was promised, and the blur behind it flattens
+   what little variation gets through. Thinner glass looks better in a
+   screenshot and fails on a bright frame. */
+section {
+  position: relative;
+  margin-block: 1.1rem;
+  padding: 2rem 1.5rem;
+  border-radius: 1.5rem;
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 45%, transparent) inset,
+    0 18px 40px -24px color-mix(in srgb, var(--curtain) 55%, transparent);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  section {
+    -webkit-backdrop-filter: blur(18px) saturate(1.25);
+    backdrop-filter: blur(18px) saturate(1.25);
+    /* Thinner where the blur is doing the work of hiding the backdrop. */
+    background: color-mix(in srgb, var(--paper) 62%, transparent);
+  }
+}
+
+/* Every section gets a pane, including the names — but the names only once
+   they have stopped inverting. While blending is on they must sit on open air:
+   a translucent panel is what they would blend against, and the footage behind
+   it would count for nothing. So the pane arrives with the colour settle,
+   fading in over the same beat rather than snapping on. */
+main.blending > .couple-section {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+main > .couple-section {
+  transition:
+    opacity 900ms ease,
+    transform 900ms ease,
+    background-color 1.2s ease,
+    border-color 1.2s ease;
+}
 
 .label {
   font-size: .68rem;
@@ -278,6 +503,32 @@ html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.06rem; line-h
   line-height: 1.7;
   color: var(--ink);
   font-weight: 400;
+  transition: color 1.2s ease;
+}
+
+/* ── Names over the clip ─────────────────────────────────────────
+   While the video is still running the names read as the inverse of whatever
+   is behind them: white on a dark frame, black on a bright one, changing as
+   the footage does. `difference` against white gives exactly that, per pixel
+   and per frame, with no sampling and nothing to keep in sync.
+
+   This is why the clip sits at the bottom of the root stacking context and
+   why `main` carries no z-index — blending only reaches what is painted below
+   it in the same context.
+
+   The gold ampersand is exempt: inverting it turns it a muddy cyan. It holds
+   its own colour and simply fades in with the rest. */
+main.blending .couple {
+  color: #fff;
+  mix-blend-mode: difference;
+}
+main.blending .couple .amp { mix-blend-mode: normal; }
+
+/* Where blending is unavailable the names just use their own colour. Worth
+   stating rather than leaving to chance: the fallback for `difference` is no
+   blending at all, which on a dark frame would be dark ink on dark video. */
+@supports not (mix-blend-mode: difference) {
+  main.blending .couple { color: var(--paper); mix-blend-mode: normal; }
 }
 .couple .amp {
   display: block;
@@ -344,15 +595,45 @@ html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.06rem; line-h
 }
 .begun { font-family: var(--f-serif); font-size: 1.3rem; color: var(--gold-deep); margin: 0; }
 
+/* An evening runs in order, so it is drawn as one: a spine down the times with
+   a mark at each moment. Rules between rows made it a table of two columns that
+   happened to be sorted. */
 .programme { list-style: none; margin: 0 auto; padding: 0; max-width: 20rem; text-align: start; }
 .programme li {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 1rem;
-  padding: .7rem 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--gold) 20%, transparent);
+  padding: .75rem 0 .75rem 0;
 }
-.programme li:last-child { border-bottom: 0; }
+
+/* The spine, drawn between the marks rather than through them — it stops short
+   on the last row so the line ends at the final moment instead of trailing off
+   into nothing. */
+.programme li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 4.35rem;
+  top: 1.5rem;
+  bottom: -.35rem;
+  width: 1px;
+  background: color-mix(in srgb, var(--gold) 28%, transparent);
+}
+.programme li:last-child::before { display: none; }
+
+.programme li::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 4.1rem;
+  top: .95rem;
+  width: .45rem;
+  height: .45rem;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--paper) 80%, transparent);
+}
+
+.programme span { padding-inline-start: 1.15rem; }
 .programme time {
   flex: none;
   width: 3.8rem;
@@ -452,15 +733,76 @@ footer {
      or a draft looks identical to a live invitation. --}}
 @include('public._draft-notice')
 
-<div id="curtain">
+{{-- ── Backdrop ─────────────────────────────────────────────────────
+     The clip lives here rather than inside the curtain, at the very bottom of
+     the root stacking context, because two things depend on it being there.
+
+     The names blend against it with mix-blend-mode, and blending only reaches
+     what is painted below in the *same* stacking context — inside the curtain
+     (z-index 50) it was unreachable from the content, and `main` must not
+     carry a z-index of its own for the same reason.
+
+     And it outlives the intro: once the reveal is done the same element keeps
+     running, reversed and blurred, as the surface the glass panels refract. --}}
+<div id="backdrop" aria-hidden="true">
     @if ($template->intro_video)
-        <video id="intro" playsinline preload="auto" muted src="{{ $template->intro_video }}"></video>
+        <video
+            id="intro"
+            playsinline
+            preload="auto"
+            muted
+            src="{{ $template->intro_video }}"
+        ></video>
     @endif
+
+    {{-- The ambient loop: the same clip reversed and slowed, encoded small
+         because it is only ever seen through a heavy blur. Absent until the
+         template has been re-saved, and the intro clip stands in for it. --}}
+    @if ($template->ambient_video ?? null)
+        <video
+            id="ambient"
+            playsinline
+            preload="none"
+            muted
+            loop
+            src="{{ $template->ambient_video }}"
+        ></video>
+    @endif
+</div>
+
+<div id="curtain">
     <div id="prompt">
         <div class="ring"><span></span></div>
         <p>{{ __('invitation.tap') }}</p>
     </div>
 </div>
+
+{{-- ── Petals ───────────────────────────────────────────────────────
+     Over the invitation rather than behind it: behind the glass they would only
+     show in the gaps between panes, and with a pane on every section there are
+     barely any.
+
+     Two nested elements per petal because a leaf's fall is two motions — down,
+     and swinging across — and one element has only one `transform` for them to
+     fight over. The outer drops, the inner swings and turns. --}}
+@if ($petal)
+    <div id="petals" aria-hidden="true">
+        @foreach ($petals as $p2)
+            <div
+                class="petal"
+                style="
+                    --x: {{ $p2['x'] }}%;
+                    --size: {{ $p2['size'] }}px;
+                    --dur: {{ $p2['dur'] }}s;
+                    --delay: {{ $p2['delay'] }}s;
+                    --drift: {{ $p2['drift'] }}rem;
+                    --spin: {{ $p2['spin'] }}deg;
+                    --tint: {{ $p[$p2['tint']] }};
+                "
+            ><i></i></div>
+        @endforeach
+    </div>
+@endif
 
 {{-- Never autoplays: playback starts in the tap handler, both to respect
      browser autoplay policy and because the reveal is the moment the
@@ -487,6 +829,12 @@ footer {
     </nav>
 @endif
 
+{{-- Only drawn when there is something below the fold to scroll to, which the
+     script decides once the content is laid out. --}}
+<div id="more" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</div>
+
 <main id="content">
 
     @if ($invitation->show_verse && $verse !== '')
@@ -507,7 +855,9 @@ footer {
         </section>
     @endif
 
-    <section>
+    {{-- Released first, while the clip is still running, and never moved: the
+         two phases differ in what is visible, not in where anything sits. --}}
+    <section class="couple-section">
         <h1 class="couple" lang="ar" dir="rtl">
             <span class="name">{{ $invitation->groom_ar }}@if ($invitation->showsLatinNames())<em class="latin">{{ $invitation->groom_latin }}</em>@endif</span>
             <span class="amp">&amp;</span>
@@ -522,7 +872,12 @@ footer {
         @if ($hijri = $invitation->hijriDate())
             <p class="hijri">{{ $hijri }}</p>
         @endif
-        <p class="at-time">{{ $invitation->formattedTime() }}</p>
+        <p class="at-time">
+            {{ $invitation->formattedTime() }}
+            @if ($endTime = $invitation->formattedEndTime())
+                <span class="until">&ndash; {{ $endTime }}</span>
+            @endif
+        </p>
     </section>
 
     <section>
@@ -594,6 +949,8 @@ const ARABIC_NUMERALS = @json(config("templates.locales.{$locale}.numerals") ===
 
 const curtain  = document.getElementById('curtain');
 const intro    = document.getElementById('intro');
+const ambient  = document.getElementById('ambient');
+const petals   = document.getElementById('petals');
 const promptEl = document.getElementById('prompt');
 const music    = document.getElementById('music');
 const content  = document.getElementById('content');
@@ -711,22 +1068,48 @@ if (muteBtn) {
     });
 }
 
-/* ── the sequence ───────────────────────────────────────────────── */
-let opened = false, revealed = false, fadeTimer = null;
+/* ── the sequence ───────────────────────────────────────────────────
+   Three beats, not one:
+
+     1. the names alone, over the running clip, reading as its inverse
+     2. the clip dissolves and the names settle into their own colour
+     3. the rest of the invitation arrives and the page unlocks
+
+   Nothing moves between beats. The names are released in their final position
+   and stay there — what changes is what else is visible around them. */
+let opened = false, named = false, revealed = false;
+let fadeTimer = null, namesTimer = null;
+
+/* Held from the first paint. Every path out of the intro has to release it,
+   which is why unlock() is called from reveal() and nowhere else. */
+function hold() { document.documentElement.classList.add('held'); }
+
+function release() {
+    document.documentElement.classList.remove('held');
+    // In case a stray gesture moved the page before the lock applied.
+    window.scrollTo(0, 0);
+}
+
+hold();
 
 curtain.addEventListener('click', () => {
     if (opened) return;
     opened = true;
 
     promptEl.classList.add('gone');
+    // Clears the scrim so the clip beneath shows; the curtain itself stays
+    // until the reveal so nothing below it can be touched yet.
+    curtain.classList.add('opened');
 
     if (intro) {
         intro.classList.add('playing');
         intro.muted = CONFIG.keepVideoAudioMs === 0;
         intro.currentTime = 0;
-        intro.play().then(armFadeOut).catch(reveal);
+        intro.play().then(armSequence).catch(reveal);
     } else {
-        setTimeout(reveal, 400);
+        // No clip: the names still lead, just on a timer rather than a duration.
+        showNames();
+        setTimeout(reveal, 900);
     }
 
     if (CONFIG.keepVideoAudioMs > 0 && intro) {
@@ -738,22 +1121,138 @@ curtain.addEventListener('click', () => {
     setTimeout(reveal, CONFIG.revealFallbackMs);
 });
 
+/**
+ * The names, over the clip, inverted against it.
+ *
+ * Separate from reveal() so a failed or stalled video cannot leave the page
+ * showing nothing but a fading curtain: whichever path fires first, the names
+ * are already there.
+ */
+function showNames() {
+    if (named) return;
+    named = true;
+
+    content.classList.add('blending', 'names-in');
+}
+
 /* Start the dissolve before the clip runs out so it fades while still in
    motion. setTimeout for precision; timeupdate backs it up if playback
    stalls or seeks. */
-function armFadeOut() {
+/* ── the scroll cue ─────────────────────────────────────────────────
+   Shown only when there is more page than screen, and taken away the moment it
+   has been acted on. Measured after a frame so the reveal's own layout has
+   settled — asking before that reports the collapsed height and concludes there
+   is nothing to scroll to. */
+function armScrollCue() {
+    const cue = document.getElementById('more');
+    if (!cue) return;
+
+    requestAnimationFrame(() => {
+        if (document.documentElement.scrollHeight - window.innerHeight < 80) return;
+
+        cue.classList.add('on');
+
+        const dismiss = () => {
+            cue.classList.remove('on');
+            setTimeout(() => cue.remove(), 1000);
+        };
+
+        window.addEventListener('scroll', dismiss, { once: true, passive: true });
+    });
+}
+
+/* ── petals ─────────────────────────────────────────────────────────
+   Started with the reveal and taken away again once the first look is over.
+   Leaving them falling forever means anyone reading the programme does it with
+   movement in the corner of their eye, which stops being charming quickly. */
+function startPetals() {
+    if (!petals) return;
+
+    // Motion is the whole of what this is, so the preference means none of it.
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    petals.classList.add('on');
+
+    setTimeout(() => {
+        petals.classList.remove('on');
+        // Taken out of the document once faded, so nothing keeps animating
+        // off-screen for the rest of the visit.
+        setTimeout(() => petals.remove(), 2600);
+    }, CONFIG.petalsMs);
+}
+
+/* ── the ambient backdrop ───────────────────────────────────────────
+   The clip again, reversed and slowed to almost nothing, blurred past
+   recognition. It is not there to be watched — it is there so the glass panels
+   have something moving to refract, which is what stops them looking like flat
+   translucent rectangles.
+
+   Reversed because forward playback loops with a visible jump back to the first
+   frame; reversed footage of a slow motion reads as continuous drift. */
+function startAmbient() {
+    // Motion is the entire point of this layer, so honouring the preference
+    // means not running it at all rather than running it faster.
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const layer = ambient ?? intro;
+    if (!layer) return;
+
+    layer.playbackRate = CONFIG.ambientRate;
+    layer.loop = true;
+    layer.muted = true;
+
+    // Without a reversed encode the intro clip stands in, blurred in place.
+    layer.classList.add(layer === intro ? 'ambient' : 'on');
+
+    layer.play().catch(() => {
+        // Refused, which costs nothing but the effect. Take the blur off so it
+        // does not sit there as a frozen smear.
+        layer.classList.remove('ambient', 'on');
+    });
+
+    // A video decoding behind a hidden tab is pure battery for no one's
+    // benefit, and phones background these aggressively anyway.
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) layer.pause();
+        else layer.play().catch(() => {});
+    });
+}
+
+/**
+ * Schedule both beats off the clip's own duration.
+ *
+ * The names come in `namesLeadMs` before the end, the dissolve starts at
+ * `fadeOutLeadMs` before it — so the names have the clip to themselves for the
+ * difference between the two. setTimeout for precision; timeupdate below backs
+ * it up if playback stalls or the guest seeks.
+ */
+function armSequence() {
     if (!intro) return;
     const d = intro.duration;
-    if (!isFinite(d) || d <= 0) return;
+    if (!isFinite(d) || d <= 0) {
+        // Duration unknown, so lead times mean nothing. Show the names now
+        // rather than leave the clip playing over an empty page.
+        showNames();
+
+        return;
+    }
+
+    const left = at => Math.max(0, (d - at / 1000 - intro.currentTime) * 1000);
+
+    clearTimeout(namesTimer);
     clearTimeout(fadeTimer);
-    fadeTimer = setTimeout(reveal, Math.max(0, (d - CONFIG.fadeOutLeadMs / 1000 - intro.currentTime) * 1000));
+    namesTimer = setTimeout(showNames, left(CONFIG.namesLeadMs));
+    fadeTimer = setTimeout(reveal, left(CONFIG.fadeOutLeadMs));
 }
 
 if (intro) {
-    intro.addEventListener('loadedmetadata', () => { if (opened) armFadeOut(); });
+    intro.addEventListener('loadedmetadata', () => { if (opened) armSequence(); });
     intro.addEventListener('timeupdate', () => {
         const d = intro.duration;
-        if (isFinite(d) && d - intro.currentTime <= CONFIG.fadeOutLeadMs / 1000) reveal();
+        if (!isFinite(d)) return;
+        const left = d - intro.currentTime;
+        if (left <= CONFIG.namesLeadMs / 1000) showNames();
+        if (left <= CONFIG.fadeOutLeadMs / 1000) reveal();
     });
     intro.addEventListener('ended', reveal);
     intro.addEventListener('error', reveal);
@@ -763,18 +1262,37 @@ function reveal() {
     if (revealed) return;
     revealed = true;
     clearTimeout(fadeTimer);
+    clearTimeout(namesTimer);
+
+    // If the clip failed early the names may never have had their moment; they
+    // still lead, just by a shorter margin than intended.
+    showNames();
 
     curtain.classList.add('gone');
+
+    // The stagger step comes from the element's own position, counted here
+    // rather than written into the stylesheet — sections are conditional, so a
+    // verse-less invitation would otherwise leave a hole in the sequence.
+    Array.from(content.children).forEach((el, i) => el.style.setProperty('--i', i));
+
     content.classList.add('revealed');
     if (muteBtn) muteBtn.classList.add('on');
     if (langs) langs.classList.add('on');
     settleMusic();
+    release();
+    startPetals();
+    armScrollCue();
+
+    // Once the clip is out of sight the names have nothing left to invert
+    // against, so they come off blend mode and take their own colour.
+    setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
 
     // Let the clip run through the whole dissolve — pausing here is what
     // made it look like it stopped and then faded.
     setTimeout(() => {
         if (intro) intro.pause();
         curtain.remove();
+        startAmbient();
     }, CONFIG.crossfadeMs + 200);
 }
 

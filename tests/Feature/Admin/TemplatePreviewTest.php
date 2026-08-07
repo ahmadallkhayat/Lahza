@@ -74,9 +74,11 @@ class TemplatePreviewTest extends TestCase
         // preview cannot drift from the invitation.
         $this->post('/admin/templates/preview', $this->payload())
             ->assertOk()
-            ->assertSee('armFadeOut', false)      // the reveal sequence
+            ->assertSee('armSequence', false)     // the reveal sequence
+            ->assertSee('showNames', false)       // and both of its beats
             ->assertSee('const TARGET', false)    // the countdown
-            ->assertSee('id="curtain"', false);
+            ->assertSee('id="curtain"', false)
+            ->assertSee('id="backdrop"', false);  // the layer the names blend on
     }
 
     /**
