@@ -198,9 +198,9 @@
                 </x-ui.field>
 
                 <x-ui.field
-                    label="Suits"
+                    label="What it is for"
                     name="field"
-                    hint="Which field this is written for. Only a hint — any block can be inserted anywhere."
+                    hint="Sets which section of the library it sits in, and which field offers it first. Any block can still be inserted anywhere."
                 >
                     <x-ui.select name="field">
                         <option value="">Anything</option>

@@ -56,7 +56,7 @@
         </form>
     @endif
 
-    @if ($groups->isEmpty())
+    @if ($sections->isEmpty())
         <x-ui.card padded="false">
             <x-ui.empty
                 icon="rectangle-stack"
@@ -76,8 +76,8 @@
         </x-ui.card>
     @else
         <div class="space-y-6">
-            @foreach ($groups as $kindKey => $assets)
-                @php($meta = Asset::KIND_META[$kindKey] ?? ['icon' => 'rectangle-stack', 'blurb' => ''])
+            @foreach ($sections as $section)
+                @php($assets = $section['assets'])
 
                 <x-ui.card padded="false">
                     {{-- Written out rather than passed as :title, so the section
@@ -85,20 +85,22 @@
                     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-ink-200 px-5 py-4">
                         <div class="flex min-w-0 items-center gap-2.5">
                             <x-dynamic-component
-                                :component="'heroicon-o-'.$meta['icon']"
+                                :component="'heroicon-o-'.$section['icon']"
                                 class="h-4 w-4 shrink-0 text-ink-400"
                             />
-                            <h2 class="text-sm font-semibold text-ink-900">
-                                {{ Asset::KINDS[$kindKey] ?? $kindKey }}
-                            </h2>
+                            <h2 class="text-sm font-semibold text-ink-900">{{ $section['label'] }}</h2>
                             <span class="text-xs text-ink-500">
                                 {{ $assets->count() }} {{ Str::plural('asset', $assets->count()) }}
                             </span>
                         </div>
 
+                        {{-- Opens the form already filed under this section, so
+                             adding a second verse never means re-answering what
+                             it is. --}}
                         <x-ui.button
                             :href="route('admin.assets.create', array_filter([
-                                'kind' => $kindKey,
+                                'kind' => $section['kind'],
+                                'field' => $section['field'],
                                 'base' => $base !== 'shared' ? $base : null,
                             ]))"
                             variant="ghost"
@@ -128,9 +130,10 @@
                                     @endif
                                 </x-ui.td>
 
-                                {{-- Which design owns this, plus the qualifiers
-                                     that used to sit under the kind badge. The
-                                     kind itself is the section heading now. --}}
+                                {{-- Which design owns this, and the language it
+                                     is written in. Not what it is for — that is
+                                     the section heading, and repeating it in
+                                     every row of that section says nothing. --}}
                                 <x-ui.td>
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         <x-ui.badge :tone="$asset->base_template === null ? 'neutral' : 'brand'">
@@ -138,9 +141,6 @@
                                         </x-ui.badge>
                                         @if ($asset->localeLabel())
                                             <span class="text-xs text-ink-500">{{ $asset->localeLabel() }}</span>
-                                        @endif
-                                        @if ($asset->fieldLabel())
-                                            <span class="text-xs text-ink-500">· {{ $asset->fieldLabel() }}</span>
                                         @endif
                                     </div>
                                 </x-ui.td>

@@ -38,17 +38,18 @@ class AssetController extends Controller
             ->ordered()
             ->get();
 
+        // A section each, in the order Asset::sections() lists them rather than
+        // whatever order the rows arrived in — so the page does not reshuffle
+        // as the library fills up. Empty sections are dropped, which is what
+        // keeps "Text — not filed" out of sight until something lands in it.
+        $grouped = $assets->groupBy(fn (Asset $asset) => $asset->sectionKey());
+
+        $sections = collect(Asset::sections())
+            ->filter(fn ($meta, $key) => $grouped->has($key))
+            ->map(fn ($meta, $key) => $meta + ['assets' => $grouped[$key]]);
+
         return view('admin.assets.index', [
-            // Grouped by kind: clips, tracks and text are different things that
-            // happen to share a table, and a section each is how the library
-            // gets read. Which design an asset belongs to is a property of the
-            // row, shown in its own column, not a reason to split the page.
-            //
-            // Sorted into KINDS order rather than whatever the rows arrived in,
-            // so the sections do not reshuffle as the library fills up.
-            'groups' => $assets
-                ->groupBy('kind')
-                ->sortBy(fn ($rows, $kind) => array_search($kind, array_keys(Asset::KINDS), true)),
+            'sections' => $sections,
             'baseTemplates' => BaseTemplates::available(),
             'base' => $base,
             'kind' => $kind,
@@ -59,13 +60,19 @@ class AssetController extends Controller
     public function create(Request $request): View
     {
         $kind = (string) $request->query('kind');
+        $field = (string) $request->query('field');
 
         return view('admin.assets.create', [
             // No kind by default. Choosing what this is comes first, and the
             // rest of the form follows from it — defaulting to text put the
             // studio in the middle of one answer before it had been asked.
+            //
+            // Both are prefilled when the library sends you here from a
+            // section, so adding a second verse does not mean saying it is a
+            // verse again.
             'asset' => new Asset([
                 'kind' => array_key_exists($kind, Asset::KINDS) ? $kind : '',
+                'field' => array_key_exists($field, Asset::textFields()) ? $field : null,
                 'base_template' => $request->query('base') ?: null,
                 'is_active' => true,
             ]),

@@ -1,3 +1,25 @@
+@props([
+    'title' => null,
+
+    /**
+     * How wide this page's column is. Set here rather than by each page
+     * putting a max-w-* on its own form, which is how three pages ended up
+     * with a full-width header above a narrow column hugging the left edge.
+     *
+     *   wide  tables, dashboards, and the template studio with its preview rail
+     *   form  a single column of fields, centred — nothing gains from a form
+     *         field a thousand pixels wide
+     */
+    'width' => 'wide',
+])
+
+@php
+    $column = match ($width) {
+        'form' => 'max-w-3xl',
+        default => 'max-w-7xl',
+    };
+@endphp
+
 <!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
@@ -112,8 +134,11 @@
         {{-- @container so pages can lay out against the width they actually
              have, not the viewport. A viewport breakpoint would be wrong here:
              the sidebar takes 16rem off, so `lg` means far less usable width
-             than it looks. --}}
-        <div class="@container mx-auto max-w-7xl">
+             than it looks.
+
+             The header and the content share this one column, so a page is
+             never a wide heading over a narrow body. --}}
+        <div class="@container mx-auto {{ $column }}">
             @if (session('status'))
                 <x-ui.alert tone="ok" class="mb-6">{{ session('status') }}</x-ui.alert>
             @endif

@@ -1,4 +1,4 @@
-<x-layouts.admin :title="$asset->name">
+<x-layouts.admin :title="$asset->name" width="form">
     <x-ui.page-header :title="$asset->name" :description="$asset->kindLabel().' · '.$asset->baseTemplateLabel()">
         <x-slot:actions>
             <x-ui.button :href="route('admin.assets.index')" variant="secondary">Back</x-ui.button>
@@ -17,7 +17,7 @@
         </x-ui.alert>
     @endif
 
-    <form method="POST" action="{{ route('admin.assets.update', $asset) }}" enctype="multipart/form-data" class="max-w-3xl space-y-6">
+    <form method="POST" action="{{ route('admin.assets.update', $asset) }}" enctype="multipart/form-data" class="space-y-6">
         @csrf
         @method('PUT')
 

@@ -1,4 +1,4 @@
-<x-layouts.admin title="Account">
+<x-layouts.admin title="Account" width="form">
     <x-ui.page-header
         title="Account"
         description="Your sign-in details. There is one studio account — these are its settings."
@@ -8,7 +8,7 @@
          change cannot discard unsaved profile edits, and each posts only what
          it owns. Capped at prose width: full-bleed inputs on a wide screen are
          harder to scan, not easier. --}}
-    <div class="max-w-2xl space-y-6">
+    <div class="space-y-6">
 
         {{-- ── Profile ─────────────────────────────────────────────── --}}
         <x-ui.card title="Profile" description="Your name, and the username you sign in with.">

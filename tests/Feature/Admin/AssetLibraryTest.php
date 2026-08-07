@@ -46,8 +46,75 @@ class AssetLibraryTest extends TestCase
             ->assertOk()
             ->assertSee('A hosting line')
             ->assertSee('Ring box opening')
-            // Grouped by design, with the shared ones under their own heading.
+            // Which design owns a row is a column on it, not the grouping.
             ->assertSee('Shared — all templates');
+    }
+
+    /**
+     * A verse and a hosting line are both "text" the way a clip and a track
+     * are both "media" — which is to say not usefully. One Text pile mixing
+     * them is the same nesting the per-design grouping had, one level down.
+     */
+    public function test_text_is_sectioned_by_what_it_is_for(): void
+    {
+        Asset::factory()->create(['name' => 'Ar-Rum 30:21', 'field' => 'verse']);
+        Asset::factory()->create(['name' => 'Both families', 'field' => 'hosts']);
+
+        $html = $this->get('/admin/assets')->assertOk()->getContent();
+
+        $this->assertStringContainsString('>Verse</h2>', $html);
+        $this->assertStringContainsString('>Hosting line</h2>', $html);
+
+        // The verse heading comes before the hosting line's row, and vice
+        // versa — that is what proves they are in separate sections rather
+        // than one list with two headings above it.
+        $this->assertLessThan(
+            strpos($html, 'Both families'),
+            strpos($html, '>Hosting line</h2>')
+        );
+        $this->assertLessThan(
+            strpos($html, 'Ar-Rum 30:21'),
+            strpos($html, '>Verse</h2>')
+        );
+    }
+
+    public function test_a_section_with_nothing_in_it_is_not_drawn(): void
+    {
+        Asset::factory()->create(['field' => 'verse']);
+
+        $html = $this->get('/admin/assets')->assertOk()->getContent();
+
+        $this->assertStringContainsString('>Verse</h2>', $html);
+        // Declared by the design, but empty — so it is not a heading over
+        // nothing, and "not filed" stays out of sight until it is needed.
+        $this->assertStringNotContainsString('>Venue</h2>', $html);
+        $this->assertStringNotContainsString('Text — not filed', $html);
+    }
+
+    public function test_text_filed_under_nothing_gets_its_own_section(): void
+    {
+        Asset::factory()->create(['name' => 'Odd one out', 'field' => null]);
+
+        $this->get('/admin/assets')
+            ->assertOk()
+            ->assertSee('Text — not filed')
+            ->assertSee('Odd one out');
+    }
+
+    public function test_adding_from_a_section_arrives_already_filed(): void
+    {
+        // So a second verse never means answering "what is this" again.
+        $this->get('/admin/assets/create?kind=text&field=verse')
+            ->assertOk()
+            ->assertSee('value="verse" selected', false);
+    }
+
+    public function test_a_category_no_design_declares_is_not_offered(): void
+    {
+        $this->get('/admin/assets/create?kind=text')
+            ->assertOk()
+            ->assertSee('value="verse"', false)
+            ->assertDontSee('value="programme"', false);
     }
 
     public function test_the_nav_offers_the_library(): void

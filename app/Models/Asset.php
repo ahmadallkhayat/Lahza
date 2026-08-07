@@ -166,6 +166,68 @@ class Asset extends Model
         return self::KIND_META[$this->kind]['icon'] ?? 'rectangle-stack';
     }
 
+    /**
+     * Which section of the library this belongs in.
+     *
+     * Media sections by kind, but text sections by what it is *for*: a verse
+     * and a hosting line are both "text" the way a video and a track are both
+     * "media", which is to say not usefully. One Text pile mixing them is the
+     * same nesting problem the per-design grouping had, one level down.
+     */
+    public function sectionKey(): string
+    {
+        return $this->isText() ? 'text:'.($this->field ?: '') : $this->kind;
+    }
+
+    /**
+     * Every section the library can show, in reading order: the media kinds,
+     * then one per text category, then anything filed under nothing.
+     *
+     * The text categories come from what the designs declare, so a section
+     * exists exactly when there is somewhere on an invitation to put it.
+     *
+     * @return array<string, array{label: string, icon: string, kind: string, field: string|null}>
+     */
+    public static function sections(): array
+    {
+        $sections = [];
+
+        foreach (self::KINDS as $kind => $label) {
+            if ($kind === self::KIND_TEXT) {
+                continue;
+            }
+
+            $sections[$kind] = [
+                'label' => $label,
+                'icon' => self::KIND_META[$kind]['icon'],
+                'kind' => $kind,
+                'field' => null,
+            ];
+        }
+
+        $textIcon = self::KIND_META[self::KIND_TEXT]['icon'];
+
+        foreach (self::textFields() as $field => $label) {
+            $sections['text:'.$field] = [
+                'label' => $label,
+                'icon' => $textIcon,
+                'kind' => self::KIND_TEXT,
+                'field' => $field,
+            ];
+        }
+
+        // Last, and only drawn when something is in it: text written before it
+        // was clear what it was for.
+        $sections['text:'] = [
+            'label' => 'Text — not filed',
+            'icon' => $textIcon,
+            'kind' => self::KIND_TEXT,
+            'field' => null,
+        ];
+
+        return $sections;
+    }
+
     /** Public disk directory for this asset's uploads. */
     public function directory(): string
     {
