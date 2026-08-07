@@ -99,10 +99,12 @@ class AssetLibrarySeeder extends Seeder
             ]
         );
 
-        // The two text rows this replaces, if an earlier seed left them.
-        Asset::where('kind', Asset::KIND_TEXT)
-            ->where('name', 'Ar-Rum 30:21 — English')
-            ->delete();
+        // The separate English row this replaces, if an earlier seed left it.
+        //
+        // Not filtered by kind: the migration that introduced the verse kind
+        // moved everything filed under "verse" onto it, this row included, so
+        // looking for a text row would no longer find it.
+        Asset::where('name', 'Ar-Rum 30:21 — English')->delete();
     }
 
     /**
