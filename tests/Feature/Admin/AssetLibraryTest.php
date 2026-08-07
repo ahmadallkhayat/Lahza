@@ -152,6 +152,56 @@ class AssetLibraryTest extends TestCase
         $this->assertNull($asset->locale);
     }
 
+    /**
+     * There is no Arabic translation box, because the verse is Arabic. A
+     * translation of Arabic into Arabic is a field that can never hold
+     * anything meaningful, and offering one invites someone to paste the verse
+     * into it and have it printed twice.
+     */
+    public function test_a_verse_is_not_offered_a_translation_in_its_own_language(): void
+    {
+        $html = $this->get('/admin/assets/create?kind=verse')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('translation[ar]', $html);
+        $this->assertStringContainsString('translation[ku]', $html);
+        $this->assertStringContainsString('translation[en]', $html);
+
+        // The reference is per language throughout — سورة الروم in Arabic and
+        // Kurdish, QURAN 30:21 in English.
+        foreach (['ar', 'ku', 'en'] as $code) {
+            $this->assertStringContainsString('reference['.$code.']', $html);
+        }
+    }
+
+    public function test_an_arabic_translation_is_refused_even_when_posted_directly(): void
+    {
+        $this->post('/admin/assets', [
+            'kind' => Asset::KIND_VERSE,
+            'name' => 'Ar-Rum 30:21',
+            'body' => 'وَمِنْ آيَاتِهِ',
+            'translation' => ['ar' => 'smuggled', 'en' => 'And among His signs…'],
+        ])->assertSessionHasNoErrors();
+
+        $translation = Asset::sole()->translation;
+
+        $this->assertArrayNotHasKey('ar', $translation);
+        $this->assertSame('And among His signs…', $translation['en']);
+    }
+
+    public function test_the_invitation_verse_card_has_no_arabic_translation_either(): void
+    {
+        // The exclusion is declared on the slot, so both editors agree without
+        // either of them naming Arabic.
+        Template::factory()->create(['base_template' => 'luxury-wedding-v1']);
+
+        $html = $this->get('/admin/invitations/create')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('content[verse_translation][ar]', $html);
+        $this->assertStringContainsString('content[verse_translation][en]', $html);
+        // The verse itself and its reference still are, in Arabic.
+        $this->assertStringContainsString('content[verse_ref][ar]', $html);
+    }
+
     public function test_a_verse_needs_the_verse_itself(): void
     {
         $this->post('/admin/assets', [

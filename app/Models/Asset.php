@@ -39,6 +39,16 @@ class Asset extends Model
      */
     public const KIND_VERSE = 'verse';
 
+    /**
+     * The language a verse is written in.
+     *
+     * Named once because two places have to agree about it: the asset editor
+     * offers no translation box in this language, and the slot that receives
+     * one declares the same exclusion. A translation of Arabic into Arabic is
+     * a field that can never hold anything meaningful.
+     */
+    public const VERSE_LANGUAGE = 'ar';
+
     /** @var array<string, string> */
     public const KINDS = [
         self::KIND_VIDEO => 'Intro video',

@@ -27,7 +27,7 @@
     ];
 
     foreach ($contentFields as $key => $meta) {
-        $contentFields[$key] = $meta + ['name' => $key, 'arabic' => false, 'hint' => null, 'rows' => null];
+        $contentFields[$key] = $meta + ['name' => $key, 'arabic' => false, 'except' => [], 'hint' => null, 'rows' => null];
     }
 
     $normaliseSlot = fn (array $meta, string $key) => [
@@ -35,6 +35,7 @@
         'hint' => $meta['hint'] ?? null,
         'rows' => $meta['rows'] ?? null,
         'arabic' => (bool) ($meta['arabic'] ?? false),
+        'except' => (array) ($meta['except'] ?? []),
         'name' => "content[$key]",
     ];
 

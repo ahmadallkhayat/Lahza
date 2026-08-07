@@ -149,6 +149,21 @@ final class ContentSlots
         return array_key_exists($key, self::for($baseTemplate));
     }
 
+    /**
+     * Languages a slot is not offered in.
+     *
+     * A verse translation has no Arabic box: the verse is already Arabic, so
+     * the field could never hold anything meaningful. Declared per slot rather
+     * than special-cased in the forms, which is what keeps the asset editor
+     * and the invitation editor agreeing about it.
+     *
+     * @return array<int, string>
+     */
+    public static function except(?string $baseTemplate, string $key): array
+    {
+        return (array) (self::for($baseTemplate)[$key]['except'] ?? []);
+    }
+
     /** Whether a slot holds one Arabic value rather than one per language. */
     public static function isArabicEverywhere(?string $baseTemplate, string $key): bool
     {

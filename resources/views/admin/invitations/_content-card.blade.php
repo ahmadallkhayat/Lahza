@@ -152,9 +152,10 @@
                 @else
                     <div
                         class="grid gap-3"
-                        :style="`grid-template-columns: repeat(${locales.length}, minmax(0, 1fr))`"
+                        :style="`grid-template-columns: repeat(${shownIn(@js($meta['except'])).length}, minmax(0, 1fr))`"
                     >
                         @foreach ($locales as $code => $lang)
+                            @continue(in_array($code, $meta['except'], true))
                             <div x-show="has('{{ $code }}')" x-cloak>
                                 <div class="mb-1 flex items-center gap-1.5">
                                     <span class="text-[0.65rem] font-semibold uppercase tracking-wider text-ink-400">
@@ -277,6 +278,8 @@
                                 </template>
                             @endforeach
 
+                            {{-- Every language, no exclusions: a programme step
+                                 is described in each one. --}}
                             <div
                                 class="grid gap-3"
                                 :style="`grid-template-columns: repeat(${locales.length}, minmax(0, 1fr))`"

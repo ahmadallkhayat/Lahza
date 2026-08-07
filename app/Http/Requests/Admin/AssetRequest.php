@@ -150,7 +150,12 @@ class AssetRequest extends FormRequest
             // nothing — being a verse is the whole of what it is for.
             $data['locale'] = null;
             $data['field'] = null;
-            $data['translation'] = $this->perLocale($data['translation'] ?? []);
+            // Arabic excluded, matching the form: the verse is Arabic, so a
+            // translation into it is meaningless however it was posted.
+            $data['translation'] = $this->perLocale(
+                $data['translation'] ?? [],
+                [Asset::VERSE_LANGUAGE]
+            );
             $data['reference'] = $this->perLocale($data['reference'] ?? []);
         } else {
             $data['locale'] = filled($data['locale'] ?? null) ? $data['locale'] : null;
@@ -169,13 +174,18 @@ class AssetRequest extends FormRequest
      * language is absent rather than stored blank.
      *
      * @param  array<string, string|null>  $values
+     * @param  array<int, string>  $except  languages this field is not offered in
      * @return array<string, string>|null
      */
-    private function perLocale(array $values): ?array
+    private function perLocale(array $values, array $except = []): ?array
     {
         $kept = [];
 
         foreach (array_keys(config('templates.locales')) as $locale) {
+            if (in_array($locale, $except, true)) {
+                continue;
+            }
+
             $value = trim((string) ($values[$locale] ?? ''));
 
             if ($value !== '') {

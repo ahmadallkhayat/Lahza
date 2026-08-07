@@ -74,9 +74,14 @@
                     @else
                         <div
                             class="grid gap-3"
-                            :style="`grid-template-columns: repeat(${locales.length}, minmax(0, 1fr))`"
+                            :style="`grid-template-columns: repeat(${shownIn(@js($meta['except'])).length}, minmax(0, 1fr))`"
                         >
                             @foreach ($locales as $code => $lang)
+                                {{-- A verse has no Arabic translation: the
+                                     verse is already Arabic. Declared by the
+                                     slot, not assumed here. --}}
+                                @continue(in_array($code, $meta['except'], true))
+
                                 <div x-show="has('{{ $code }}')" x-cloak>
                                     <div class="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-ink-400">
                                         {{ $lang['label'] }}

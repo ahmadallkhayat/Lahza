@@ -184,59 +184,77 @@
      "QURAN 30:21" where an Arabic one reads سورة الروم. --}}
 <div x-show="isVerse" x-cloak class="space-y-6">
     <x-ui.card title="The verse" description="Arabic, shown as-is in every language.">
-        <div>
-            <x-ui.label for="verse_body" required>The verse</x-ui.label>
-            <textarea
-                name="body"
-                id="verse_body"
-                rows="3"
-                dir="rtl"
-                lang="ar"
-                x-model="body"
-                class="block w-full rounded-lg border-ink-300 bg-white text-base leading-loose text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500 @error('body') border-bad-400 @enderror"
-                placeholder="وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا"
-            ></textarea>
-            <p class="mt-1.5 text-xs text-ink-500">
-                Tashkeel is kept exactly as typed. No placeholders here — a verse is quoted, not composed.
-            </p>
-            <x-ui.error name="body" />
+        <div class="space-y-5">
+            <div>
+                <x-ui.label for="verse_body" required>The verse</x-ui.label>
+                <textarea
+                    name="body"
+                    id="verse_body"
+                    rows="3"
+                    dir="rtl"
+                    lang="ar"
+                    x-model="body"
+                    class="block w-full rounded-lg border-ink-300 bg-white text-base leading-loose text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500 @error('body') border-bad-400 @enderror"
+                    placeholder="وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا"
+                ></textarea>
+                <p class="mt-1.5 text-xs text-ink-500">
+                    Tashkeel is kept exactly as typed. No placeholders here — a verse is quoted, not composed.
+                </p>
+                <x-ui.error name="body" />
+            </div>
+
+            {{-- Directly under the verse, because that is where it is printed.
+                 Every language gets one: the surah reads سورة الروم in Arabic
+                 and Kurdish but QURAN 30:21 in English. --}}
+            <div>
+                <x-ui.label>Reference</x-ui.label>
+                <p class="mb-2 text-xs text-ink-500">The surah and ayah, as each language prints it.</p>
+
+                <div class="grid gap-3 sm:grid-cols-{{ min(count($locales), 3) }}">
+                    @foreach ($locales as $code => $meta)
+                        <div>
+                            <div class="mb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-ink-400">
+                                {{ $meta['label'] }}
+                            </div>
+                            <input
+                                type="text"
+                                name="reference[{{ $code }}]"
+                                id="reference_{{ $code }}"
+                                @if ($meta['rtl']) dir="rtl" @endif
+                                value="{{ old("reference.$code", data_get($asset->reference, $code)) }}"
+                                placeholder="{{ $meta['rtl'] ? 'سورة الروم — ٢١' : 'QURAN 30:21' }}"
+                                class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                            >
+                            <x-ui.error :name="'reference.'.$code" />
+                        </div>
+                    @endforeach
+                </div>
+            </div>
         </div>
     </x-ui.card>
 
+    {{-- No Arabic box. The verse is Arabic, so an Arabic translation of it is
+         a field that can never hold anything meaningful — which is why the
+         language it is written in is named once, here and in the slot that
+         receives it, rather than assumed in each form. --}}
     <x-ui.card
-        title="Translation and reference"
-        description="Per language. Leave a language empty to fall back to the design's own wording."
+        title="Translation"
+        description="Shown small beneath the verse. Leave a language empty to print none."
     >
-        <div class="space-y-5">
+        <div class="space-y-4">
             @foreach ($locales as $code => $meta)
-                <div class="grid gap-3 sm:grid-cols-[1fr_14rem]">
-                    <div>
-                        <x-ui.label :for="'translation_'.$code">
-                            {{ $meta['label'] }} — translation
-                        </x-ui.label>
-                        <textarea
-                            name="translation[{{ $code }}]"
-                            id="translation_{{ $code }}"
-                            rows="2"
-                            @if ($meta['rtl']) dir="rtl" @endif
-                            class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                        >{{ old("translation.$code", data_get($asset->translation, $code)) }}</textarea>
-                        <x-ui.error :name="'translation.'.$code" />
-                    </div>
+                @continue($code === Asset::VERSE_LANGUAGE)
 
-                    <div>
-                        <x-ui.label :for="'reference_'.$code">Reference</x-ui.label>
-                        <input
-                            type="text"
-                            name="reference[{{ $code }}]"
-                            id="reference_{{ $code }}"
-                            @if ($meta['rtl']) dir="rtl" @endif
-                            value="{{ old("reference.$code", data_get($asset->reference, $code)) }}"
-                            placeholder="{{ $meta['rtl'] ? 'سورة الروم — ٢١' : 'QURAN 30:21' }}"
-                            class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
-                        >
-                        <x-ui.error :name="'reference.'.$code" />
-                    </div>
+                <div>
+                    <x-ui.label :for="'translation_'.$code">{{ $meta['label'] }}</x-ui.label>
+                    <textarea
+                        name="translation[{{ $code }}]"
+                        id="translation_{{ $code }}"
+                        rows="2"
+                        @if ($meta['rtl']) dir="rtl" @endif
+                        class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
+                    >{{ old("translation.$code", data_get($asset->translation, $code)) }}</textarea>
+                    <x-ui.error :name="'translation.'.$code" />
                 </div>
             @endforeach
         </div>

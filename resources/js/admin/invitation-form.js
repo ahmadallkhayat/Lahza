@@ -49,6 +49,17 @@ export default function invitationForm(config) {
 
         has(code) { return this.locales.includes(code) },
 
+        /**
+         * Chosen languages a field is actually offered in.
+         *
+         * A verse translation skips Arabic — the verse is already Arabic — so
+         * the column count has to skip it too, or the grid leaves a gap where
+         * a box was not drawn.
+         */
+        shownIn(except = []) {
+            return this.locales.filter(code => ! except.includes(code));
+        },
+
         init() {
             // The checkboxes use x-model, so Alpine keeps `locales` in step
             // with them natively. These two rules are enforced afterwards

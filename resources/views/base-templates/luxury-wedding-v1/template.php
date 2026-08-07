@@ -65,10 +65,15 @@ return [
 
         'verse_translation' => [
             'label' => 'Translation',
-            'hint' => 'Shown small beneath the verse, in that language. Arabic and Kurdish leave it empty by default, since the verse already reads.',
+            'hint' => 'Shown small beneath the verse, in that language.',
             'rows' => 3,
             'default' => 'invitation.verse_translation',
             'group' => 'verse',
+
+            // Not offered in Arabic. The verse is Arabic, so an Arabic
+            // translation of it is a box that can never be filled with
+            // anything meaningful.
+            'except' => ['ar'],
         ],
 
         'verse_ref' => [
