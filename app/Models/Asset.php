@@ -40,14 +40,18 @@ class Asset extends Model
     public const KIND_VERSE = 'verse';
 
     /**
-     * The language a verse is written in.
+     * Languages that print no translation beneath a verse.
      *
-     * Named once because two places have to agree about it: the asset editor
-     * offers no translation box in this language, and the slot that receives
-     * one declares the same exclusion. A translation of Arabic into Arabic is
-     * a field that can never hold anything meaningful.
+     * Arabic because the verse is Arabic — a translation of it into Arabic is a
+     * field that can never hold anything meaningful. Kurdish because a Kurdish
+     * invitation reads the verse in Arabic too, which is what lang/ku has
+     * always assumed.
+     *
+     * One list, read by everything that has to agree about it: the asset editor
+     * draws no box for these languages, the slot receiving a translation
+     * declares the same exclusion, and the request drops them however posted.
      */
-    public const VERSE_LANGUAGE = 'ar';
+    public const VERSE_UNTRANSLATED = ['ar', 'ku'];
 
     /** @var array<string, string> */
     public const KINDS = [

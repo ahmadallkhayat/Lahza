@@ -153,23 +153,49 @@ class AssetLibraryTest extends TestCase
     }
 
     /**
-     * There is no Arabic translation box, because the verse is Arabic. A
-     * translation of Arabic into Arabic is a field that can never hold
-     * anything meaningful, and offering one invites someone to paste the verse
-     * into it and have it printed twice.
+     * English is the only language offered a verse translation.
+     *
+     * Arabic because the verse is Arabic, and a translation of it into Arabic
+     * can never hold anything meaningful. Kurdish because a Kurdish invitation
+     * reads the verse in Arabic too. Boxes that will never be filled are worse
+     * than absent ones — someone eventually pastes the verse into them.
      */
-    public function test_a_verse_is_not_offered_a_translation_in_its_own_language(): void
+    public function test_only_english_is_offered_a_verse_translation(): void
     {
         $html = $this->get('/admin/assets/create?kind=verse')->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('translation[ar]', $html);
-        $this->assertStringContainsString('translation[ku]', $html);
+        foreach (Asset::VERSE_UNTRANSLATED as $code) {
+            $this->assertStringNotContainsString('translation['.$code.']', $html);
+        }
+
         $this->assertStringContainsString('translation[en]', $html);
 
         // The reference is per language throughout — سورة الروم in Arabic and
         // Kurdish, QURAN 30:21 in English.
         foreach (['ar', 'ku', 'en'] as $code) {
             $this->assertStringContainsString('reference['.$code.']', $html);
+        }
+    }
+
+    /**
+     * And this stays scoped to verses. Ordinary text is written per language
+     * as it always was — the exclusion is about a verse being quoted, not
+     * about Kurdish.
+     */
+    public function test_ordinary_text_still_has_every_language(): void
+    {
+        Template::factory()->create(['base_template' => 'luxury-wedding-v1']);
+
+        $html = $this->get('/admin/invitations/create')->assertOk()->getContent();
+
+        foreach (['hosts', 'venue_name', 'venue_city'] as $field) {
+            foreach (['ar', 'ku', 'en'] as $code) {
+                $this->assertStringContainsString(
+                    $field.'['.$code.']',
+                    $html,
+                    $field.' lost its '.$code.' box'
+                );
+            }
         }
     }
 

@@ -157,6 +157,50 @@ class ContentSlotTest extends TestCase
         $this->assertStringContainsString($encoded, $html);
     }
 
+    /**
+     * A Kurdish invitation shows the verse and its reference, and no
+     * translation line beneath them.
+     *
+     * The verse is read in Arabic on a Kurdish invitation, so only English
+     * carries a rendering. Asserted rather than left to lang/ku happening to
+     * hold an empty string: this is a decision about what the page says, and
+     * the next person to fill that key in should have to change a test.
+     */
+    public function test_a_kurdish_invitation_shows_the_verse_untranslated(): void
+    {
+        $invitation = $this->invitation([
+            'published' => true,
+            'show_verse' => true,
+            'locales' => ['ku'],
+            'default_locale' => 'ku',
+            'content' => null,
+        ]);
+
+        $this->assertSame('', $invitation->renderIn('ku')->slot('verse_translation'));
+
+        $this->get('/i/'.$invitation->slug)
+            ->assertOk()
+            // The verse itself, in Arabic, and the reference in Kurdish.
+            ->assertSee(trim(__('invitation.verse', [], 'ku')), false)
+            ->assertSee(trim(__('invitation.verse_ref', [], 'ku')), false)
+            // No element for a translation that is not there.
+            ->assertDontSee('class="verse-en"', false);
+    }
+
+    /** English is the one language that prints a rendering beneath the verse. */
+    public function test_only_english_carries_a_verse_translation(): void
+    {
+        foreach (['ar', 'ku'] as $locale) {
+            $this->assertSame(
+                '',
+                trim(__('invitation.verse_translation', [], $locale)),
+                $locale.' should print no verse translation'
+            );
+        }
+
+        $this->assertNotSame('', trim(__('invitation.verse_translation', [], 'en')));
+    }
+
     /* ── reading a slot ───────────────────────────────────────────── */
 
     public function test_an_empty_slot_falls_back_to_the_designs_own_wording(): void

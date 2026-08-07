@@ -243,11 +243,11 @@
          receives it, rather than assumed in each form. --}}
     <x-ui.card
         title="Translation"
-        description="Shown small beneath the verse. Leave a language empty to print none."
+        description="Shown small beneath the verse. Arabic and Kurdish read the verse as it is, so neither is offered one."
     >
         <div class="space-y-4">
             @foreach ($locales as $code => $meta)
-                @continue($code === Asset::VERSE_LANGUAGE)
+                @continue(in_array($code, Asset::VERSE_UNTRANSLATED, true))
 
                 <div>
                     <x-ui.label :for="'translation_'.$code">{{ $meta['label'] }}</x-ui.label>

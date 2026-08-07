@@ -150,11 +150,12 @@ class AssetRequest extends FormRequest
             // nothing — being a verse is the whole of what it is for.
             $data['locale'] = null;
             $data['field'] = null;
-            // Arabic excluded, matching the form: the verse is Arabic, so a
-            // translation into it is meaningless however it was posted.
+            // Matching the form, which draws no box for these: the verse is
+            // read as it is in Arabic and Kurdish, so a translation into either
+            // is dropped however it was posted.
             $data['translation'] = $this->perLocale(
                 $data['translation'] ?? [],
-                [Asset::VERSE_LANGUAGE]
+                Asset::VERSE_UNTRANSLATED
             );
             $data['reference'] = $this->perLocale($data['reference'] ?? []);
         } else {

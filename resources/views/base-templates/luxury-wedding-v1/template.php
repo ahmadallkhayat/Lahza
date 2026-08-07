@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Asset;
+
 /**
  * What this design is, and what it lets an invitation say.
  *
@@ -70,10 +72,11 @@ return [
             'default' => 'invitation.verse_translation',
             'group' => 'verse',
 
-            // Not offered in Arabic. The verse is Arabic, so an Arabic
-            // translation of it is a box that can never be filled with
-            // anything meaningful.
-            'except' => ['ar'],
+            // Read off the model rather than repeated here, so the asset
+            // editor and this card cannot come to disagree about which
+            // languages print a translation. Arabic and Kurdish read the verse
+            // as it is; only English prints one beneath.
+            'except' => Asset::VERSE_UNTRANSLATED,
         ],
 
         'verse_ref' => [

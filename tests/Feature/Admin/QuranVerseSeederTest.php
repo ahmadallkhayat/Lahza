@@ -54,10 +54,10 @@ class QuranVerseSeederTest extends TestCase
      *
      * The first because a verse that arrives without one leaves the English
      * invitation falling back to whatever the design says, which is rarely the
-     * verse that was just inserted. The second because the verse is Arabic —
-     * there is nothing to translate it into for an Arabic reader.
+     * verse that was just inserted. The second because Arabic and Kurdish read
+     * the verse as it is — neither prints a rendering beneath it.
      */
-    public function test_every_verse_carries_an_english_translation(): void
+    public function test_english_is_the_only_translation_a_verse_carries(): void
     {
         $this->seed(QuranVerseSeeder::class);
 
@@ -67,11 +67,15 @@ class QuranVerseSeederTest extends TestCase
                 $verse->name.' has no English translation'
             );
 
-            $this->assertArrayNotHasKey(
-                Asset::VERSE_LANGUAGE,
-                (array) $verse->translation,
-                $verse->name.' carries a translation into the language it is written in'
-            );
+            // Arabic and Kurdish read the verse as it is, so neither should
+            // ever carry a rendering of it.
+            foreach (Asset::VERSE_UNTRANSLATED as $locale) {
+                $this->assertArrayNotHasKey(
+                    $locale,
+                    (array) $verse->translation,
+                    $verse->name.' carries a '.$locale.' translation, which is never printed'
+                );
+            }
         }
     }
 
