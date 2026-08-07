@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Models\Asset;
 use App\Models\Template;
 use App\Models\User;
+use Database\Seeders\AssetLibrarySeeder;
 use Database\Seeders\QuranVerseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -46,6 +47,48 @@ class QuranVerseSeederTest extends TestCase
             $this->assertNull($verse->field);
             $this->assertTrue($verse->is_active);
         }
+    }
+
+    /**
+     * Every verse carries an English rendering, and none carries an Arabic one.
+     *
+     * The first because a verse that arrives without one leaves the English
+     * invitation falling back to whatever the design says, which is rarely the
+     * verse that was just inserted. The second because the verse is Arabic —
+     * there is nothing to translate it into for an Arabic reader.
+     */
+    public function test_every_verse_carries_an_english_translation(): void
+    {
+        $this->seed(QuranVerseSeeder::class);
+
+        foreach (Asset::where('kind', Asset::KIND_VERSE)->get() as $verse) {
+            $this->assertNotEmpty(
+                $verse->translation['en'] ?? null,
+                $verse->name.' has no English translation'
+            );
+
+            $this->assertArrayNotHasKey(
+                Asset::VERSE_LANGUAGE,
+                (array) $verse->translation,
+                $verse->name.' carries a translation into the language it is written in'
+            );
+        }
+    }
+
+    /**
+     * Verses have one owner. AssetLibrarySeeder used to keep its own copy of
+     * Ar-Rum 30:21 alongside this seeder's, so whichever ran last decided what
+     * the verse said.
+     */
+    public function test_seeding_the_whole_library_leaves_one_copy_of_each_verse(): void
+    {
+        $this->seed(AssetLibrarySeeder::class);
+        $this->seed(QuranVerseSeeder::class);
+
+        $names = Asset::where('kind', Asset::KIND_VERSE)->pluck('name');
+
+        $this->assertSame($names->unique()->count(), $names->count());
+        $this->assertSame(1, $names->filter(fn ($n) => $n === 'Ar-Rum 30:21')->count());
     }
 
     public function test_the_arabic_carries_its_vowel_marks(): void

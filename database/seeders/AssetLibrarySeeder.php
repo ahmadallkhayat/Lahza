@@ -76,34 +76,17 @@ class AssetLibrarySeeder extends Seeder
      */
     private function verses(): void
     {
-        Asset::updateOrCreate(
-            ['kind' => Asset::KIND_VERSE, 'name' => 'Ar-Rum 30:21'],
-            [
-                'base_template' => null,
-                'field' => null,
-                'locale' => null,
-                'description' => 'The verse the invitation pages open with.',
-                'body' => 'وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا '
-                    .'لِّتَسْكُنُوا إِلَيْهَا وَجَعَلَ بَيْنَكُم مَّوَدَّةً وَرَحْمَةً',
-                'translation' => [
-                    // Arabic and Kurdish show none: the verse already reads.
-                    'en' => '“And among His signs is that He created for you mates from among yourselves, '
-                        .'that you may find tranquility in them; and He has placed between you affection and mercy.”',
-                ],
-                'reference' => [
-                    'ar' => 'سورة الروم — ٢١',
-                    'ku' => 'سورەتی الروم — ٢١',
-                    'en' => 'QURAN 30:21',
-                ],
-                'is_active' => true,
-            ]
-        );
-
-        // The separate English row this replaces, if an earlier seed left it.
+        // Delegated, so verses have one owner.
         //
-        // Not filtered by kind: the migration that introduced the verse kind
-        // moved everything filed under "verse" onto it, this row included, so
-        // looking for a text row would no longer find it.
+        // This method used to carry its own copy of Ar-Rum 30:21 while
+        // QuranVerseSeeder carried another, which meant two seeders writing the
+        // same row and whichever ran last deciding what the verse said.
+        $this->call(QuranVerseSeeder::class);
+
+        // The separate English row the verse kind replaced, if an earlier seed
+        // left it. Not filtered by kind: the migration that introduced the
+        // verse kind moved everything filed under "verse" onto it, this row
+        // included, so looking for a text row would no longer find it.
         Asset::where('name', 'Ar-Rum 30:21 — English')->delete();
     }
 
