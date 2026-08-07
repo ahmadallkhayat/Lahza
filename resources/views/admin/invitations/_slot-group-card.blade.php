@@ -16,7 +16,9 @@
 
 @foreach ($slotGroups as $groupKey => $group)
     <x-ui.card :title="$group['label']" :description="$group['description']">
-        @if (($group['asset_kind'] ?? null) && filled($groupAssets[$group['asset_kind']] ?? []))
+        {{-- Keyed by group, matching how _form built it. Reading it by asset_kind
+             worked only while the two names happened to coincide. --}}
+        @if (filled($groupAssets[$groupKey] ?? []))
             <x-slot:actions>
                 <div class="flex flex-wrap items-center gap-2">
                     <select
@@ -25,7 +27,7 @@
                         class="max-w-xs rounded-lg border-ink-300 bg-white text-xs text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500"
                     >
                         <option value="">From the library…</option>
-                        @foreach ($groupAssets[$group['asset_kind']] as $asset)
+                        @foreach ($groupAssets[$groupKey] as $asset)
                             <option value="{{ $asset['id'] }}">{{ $asset['name'] }}</option>
                         @endforeach
                     </select>

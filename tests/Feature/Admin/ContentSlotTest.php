@@ -8,6 +8,8 @@ use App\Models\Template;
 use App\Models\User;
 use App\Support\ContentSlots;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Js;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -82,6 +84,77 @@ class ContentSlotTest extends TestCase
             'body' => 'مبارك',
             'field' => 'programme',
         ])->assertSessionHasErrors('field');
+    }
+
+    /* ── slot groups ──────────────────────────────────────────────── */
+
+    /**
+     * The mapping from asset part to slot has to survive normalisation.
+     *
+     * It did not: groups() listed the keys it wanted and dropped the rest,
+     * which discarded `fills` silently. The manifest declared the mapping, the
+     * browser got an empty object, and the Insert button filled nothing with no
+     * error anywhere. The button rendered, so every test still passed.
+     */
+    public function test_a_group_keeps_the_mapping_that_fills_it(): void
+    {
+        $group = ContentSlots::groups('luxury-wedding-v1')['verse'];
+
+        $this->assertSame([
+            'verse' => 'body',
+            'verse_translation' => 'translation',
+            'verse_ref' => 'reference',
+        ], $group['fills']);
+    }
+
+    public function test_a_mapping_cannot_name_a_slot_outside_its_group(): void
+    {
+        // A stale key left in a manifest would otherwise write into a field the
+        // card does not even show.
+        foreach (ContentSlots::groups('luxury-wedding-v1') as $group) {
+            foreach (array_keys($group['fills']) as $slot) {
+                $this->assertArrayHasKey($slot, $group['slots']);
+            }
+        }
+    }
+
+    /**
+     * Every part a mapping names has to be something a library asset actually
+     * carries, or Insert would read undefined and write nothing.
+     */
+    public function test_every_mapped_part_exists_on_the_asset(): void
+    {
+        $verse = Asset::factory()->verse()->create();
+
+        foreach (ContentSlots::groups('luxury-wedding-v1') as $group) {
+            foreach ($group['fills'] as $slot => $part) {
+                $this->assertNotNull(
+                    $verse->{$part},
+                    "Slot {$slot} is filled from '{$part}', which a verse asset does not carry"
+                );
+            }
+        }
+    }
+
+    /**
+     * End to end: the mapping reaches the browser. This is the assertion that
+     * was missing — the button was tested, the data behind it was not.
+     */
+    public function test_the_mapping_reaches_the_page(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        Template::factory()->create(['base_template' => 'luxury-wedding-v1']);
+        Asset::factory()->verse()->create(['name' => 'Ar-Rum 30:21']);
+
+        $html = $this->get('/admin/invitations/create')->assertOk()->getContent();
+
+        // Serialised the same way Blade does, so this compares what the browser
+        // is handed rather than a guess at how it was escaped.
+        $fills = ContentSlots::groups('luxury-wedding-v1')['verse']['fills'];
+        $encoded = Str::between((string) Js::from($fills), "JSON.parse('", "')");
+
+        $this->assertStringContainsString($encoded, $html);
     }
 
     /* ── reading a slot ───────────────────────────────────────────── */

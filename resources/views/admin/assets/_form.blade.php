@@ -191,6 +191,10 @@
                     name="body"
                     id="verse_body"
                     rows="3"
+                    {{-- Both cards hold a body box and only one is on screen.
+                         Disabling the other keeps it out of the submission, so
+                         the form never posts the field twice. --}}
+                    x-bind:disabled="! isVerse"
                     dir="rtl"
                     lang="ar"
                     x-model="body"
@@ -320,6 +324,7 @@
                     name="body"
                     id="body"
                     rows="5"
+                    x-bind:disabled="! isText"
                     x-ref="body"
                     x-model="body"
                     :dir="dir"

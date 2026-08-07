@@ -137,6 +137,22 @@ final class ContentSlots
                 'label' => $group['label'] ?? $key,
                 'description' => $group['description'] ?? null,
                 'asset_kind' => $group['asset_kind'] ?? null,
+
+                // Which part of a library asset lands in which slot.
+                //
+                // This normaliser used to list the keys it wanted and drop the
+                // rest, which quietly discarded this one: the manifest declared
+                // the mapping, the browser received an empty object, and the
+                // Insert button filled nothing at all with no error anywhere.
+                //
+                // Narrowed to slots that really belong to this group, so a
+                // stale key left in a manifest cannot write into a field the
+                // card does not show.
+                'fills' => array_intersect_key(
+                    (array) ($group['fills'] ?? []),
+                    $members
+                ),
+
                 'slots' => $members,
             ];
         }
