@@ -7,6 +7,8 @@ use App\Http\Requests\Admin\InvitationRequest;
 use App\Models\Asset;
 use App\Models\Invitation;
 use App\Models\Template;
+use App\Support\BaseTemplates;
+use App\Support\ContentSlots;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
@@ -32,6 +34,7 @@ class InvitationController extends Controller
             ]),
             'templates' => $this->selectableTemplates(),
             'textAssets' => $this->textAssets(),
+            'groupAssets' => $this->groupAssets(),
         ]);
     }
 
@@ -52,6 +55,7 @@ class InvitationController extends Controller
             'invitation' => $invitation,
             'templates' => $this->selectableTemplates($invitation->template_id),
             'textAssets' => $this->textAssets(),
+            'groupAssets' => $this->groupAssets(),
         ]);
     }
 
@@ -113,6 +117,43 @@ class InvitationController extends Controller
             ->whereNotNull('body')
             ->ordered()
             ->get();
+    }
+
+    /**
+     * Assets that fill a whole slot group in one go, keyed by kind.
+     *
+     * A verse is one asset carrying three parts, so the form can offer a
+     * single Insert that fills the verse, its translation and its reference
+     * together — rather than the studio finding three text blocks and hoping
+     * they are the same verse.
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    private function groupAssets(): array
+    {
+        $kinds = collect(BaseTemplates::available())
+            ->flatMap(fn ($label, $base) => collect(ContentSlots::groups($base))->pluck('asset_kind'))
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $kinds
+            ->mapWithKeys(fn (string $kind) => [$kind => Asset::query()
+                ->active()
+                ->ofKind($kind)
+                ->whereNotNull('body')
+                ->ordered()
+                ->get()
+                ->map(fn (Asset $asset) => [
+                    'id' => $asset->id,
+                    'name' => $asset->name,
+                    'body' => (string) $asset->body,
+                    'translation' => (array) $asset->translation,
+                    'reference' => (array) $asset->reference,
+                ])
+                ->all(),
+            ])
+            ->all();
     }
 
     /**

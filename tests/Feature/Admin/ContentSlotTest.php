@@ -60,10 +60,16 @@ class ContentSlotTest extends TestCase
 
         // Core fields every design has.
         $this->assertArrayHasKey('hosts', $fields);
-        // Declared by the design.
-        $this->assertArrayHasKey('verse', $fields);
+        $this->assertArrayHasKey('venue_name', $fields);
+
         // Declared by nothing, so offered by nothing.
         $this->assertArrayNotHasKey('programme', $fields);
+
+        // Grouped, so not a category of plain text: the verse and its parts
+        // are one block filled from a verse asset, not three places to file
+        // a paragraph.
+        $this->assertArrayNotHasKey('verse', $fields);
+        $this->assertArrayNotHasKey('verse_ref', $fields);
     }
 
     public function test_a_category_no_design_declares_is_refused(): void
@@ -241,7 +247,7 @@ class ContentSlotTest extends TestCase
 
         $this->get('/admin/invitations/create')
             ->assertOk()
-            ->assertSee('Verse translation')
+            ->assertSee('Translation')
             ->assertSee('content[verse]', false);
     }
 }

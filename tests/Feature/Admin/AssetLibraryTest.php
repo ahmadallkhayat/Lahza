@@ -57,34 +57,33 @@ class AssetLibraryTest extends TestCase
      */
     public function test_text_is_sectioned_by_what_it_is_for(): void
     {
-        Asset::factory()->create(['name' => 'Ar-Rum 30:21', 'field' => 'verse']);
+        Asset::factory()->create(['name' => 'The garden', 'field' => 'venue_name']);
         Asset::factory()->create(['name' => 'Both families', 'field' => 'hosts']);
 
         $html = $this->get('/admin/assets')->assertOk()->getContent();
 
-        $this->assertStringContainsString('>Verse</h2>', $html);
+        $this->assertStringContainsString('>Venue</h2>', $html);
         $this->assertStringContainsString('>Hosting line</h2>', $html);
 
-        // The verse heading comes before the hosting line's row, and vice
-        // versa — that is what proves they are in separate sections rather
-        // than one list with two headings above it.
+        // Each heading precedes its own rows — that is what proves they are
+        // separate sections rather than one list with two headings above it.
         $this->assertLessThan(
             strpos($html, 'Both families'),
             strpos($html, '>Hosting line</h2>')
         );
         $this->assertLessThan(
-            strpos($html, 'Ar-Rum 30:21'),
-            strpos($html, '>Verse</h2>')
+            strpos($html, 'The garden'),
+            strpos($html, '>Venue</h2>')
         );
     }
 
     public function test_a_section_with_nothing_in_it_is_not_drawn(): void
     {
-        Asset::factory()->create(['field' => 'verse']);
+        Asset::factory()->create(['field' => 'hosts']);
 
         $html = $this->get('/admin/assets')->assertOk()->getContent();
 
-        $this->assertStringContainsString('>Verse</h2>', $html);
+        $this->assertStringContainsString('>Hosting line</h2>', $html);
         // Declared by the design, but empty — so it is not a heading over
         // nothing, and "not filed" stays out of sight until it is needed.
         $this->assertStringNotContainsString('>Venue</h2>', $html);
@@ -104,17 +103,115 @@ class AssetLibraryTest extends TestCase
     public function test_adding_from_a_section_arrives_already_filed(): void
     {
         // So a second verse never means answering "what is this" again.
-        $this->get('/admin/assets/create?kind=text&field=verse')
+        $this->get('/admin/assets/create?kind=text&field=hosts')
             ->assertOk()
-            ->assertSee('value="verse" selected', false);
+            ->assertSee('value="hosts" selected', false);
     }
 
     public function test_a_category_no_design_declares_is_not_offered(): void
     {
         $this->get('/admin/assets/create?kind=text')
             ->assertOk()
-            ->assertSee('value="verse"', false)
-            ->assertDontSee('value="programme"', false);
+            ->assertSee('value="hosts"', false)
+            ->assertDontSee('value="programme"', false)
+            // A verse is its own kind now, not a category of text.
+            ->assertDontSee('value="verse" >', false);
+    }
+
+    /* ── verses ───────────────────────────────────────────────────── */
+
+    /**
+     * A verse is its own kind, not text filed under a category. The verse, its
+     * translation and its reference are shown together and are useless apart,
+     * so they are one row carrying three parts — this used to be an Arabic row
+     * and an English row with nothing recording they were the same verse.
+     */
+    public function test_a_verse_stores_its_translation_and_reference(): void
+    {
+        $this->post('/admin/assets', [
+            'kind' => Asset::KIND_VERSE,
+            'name' => 'Ar-Rum 30:21',
+            'body' => 'وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم',
+            'translation' => ['en' => 'And among His signs…', 'ar' => ''],
+            'reference' => ['ar' => 'سورة الروم — ٢١', 'en' => 'QURAN 30:21'],
+            'is_active' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $asset = Asset::sole();
+
+        $this->assertSame(Asset::KIND_VERSE, $asset->kind);
+        $this->assertSame('And among His signs…', $asset->translation['en']);
+        $this->assertSame('QURAN 30:21', $asset->reference['en']);
+
+        // A language left blank is absent, not stored empty.
+        $this->assertArrayNotHasKey('ar', $asset->translation);
+
+        // Being a verse is the whole of what it is for, so it is filed under
+        // nothing and carries no single language.
+        $this->assertNull($asset->field);
+        $this->assertNull($asset->locale);
+    }
+
+    public function test_a_verse_needs_the_verse_itself(): void
+    {
+        $this->post('/admin/assets', [
+            'kind' => Asset::KIND_VERSE,
+            'name' => 'Empty',
+            'reference' => ['en' => 'QURAN 30:21'],
+        ])->assertSessionHasErrors('body');
+    }
+
+    public function test_plain_text_never_carries_a_translation(): void
+    {
+        // Only a verse has parts. A hosting line posting them gets them
+        // dropped rather than stored on a row that will never read them.
+        $this->post('/admin/assets', [
+            'kind' => Asset::KIND_TEXT,
+            'name' => 'Both families',
+            'body' => 'The families of {groom} and {bride}',
+            'translation' => ['en' => 'smuggled'],
+            'reference' => ['en' => 'smuggled'],
+        ])->assertSessionHasNoErrors();
+
+        $asset = Asset::sole();
+
+        $this->assertNull($asset->translation);
+        $this->assertNull($asset->reference);
+    }
+
+    public function test_verses_get_their_own_section(): void
+    {
+        Asset::factory()->verse()->create(['name' => 'Ar-Rum 30:21']);
+        Asset::factory()->create(['name' => 'Both families', 'field' => 'hosts']);
+
+        $html = $this->get('/admin/assets')->assertOk()->getContent();
+
+        $this->assertStringContainsString('>Religious verse</h2>', $html);
+        $this->assertLessThan(
+            strpos($html, 'Ar-Rum 30:21'),
+            strpos($html, '>Religious verse</h2>')
+        );
+    }
+
+    public function test_the_type_picker_offers_all_four_kinds(): void
+    {
+        $html = $this->get('/admin/assets/create')->assertOk()->getContent();
+
+        foreach (['Intro video', 'Music', 'Text', 'Religious verse'] as $label) {
+            $this->assertStringContainsString($label, $html);
+        }
+    }
+
+    public function test_the_invitation_form_offers_a_verse_from_the_library(): void
+    {
+        Template::factory()->create(['base_template' => 'luxury-wedding-v1']);
+        Asset::factory()->verse()->create(['name' => 'Ar-Rum 30:21']);
+
+        $this->get('/admin/invitations/create')
+            ->assertOk()
+            // One picker for the whole block, not three.
+            ->assertSee('insertGroup(', false)
+            ->assertSee('Ar-Rum 30:21');
     }
 
     public function test_the_nav_offers_the_library(): void

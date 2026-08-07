@@ -69,40 +69,40 @@ class AssetLibrarySeeder extends Seeder
     /**
      * Shared, not scoped to a design: a verse is not specific to one layout.
      *
-     * The Arabic is the same text the invitation pages open with, kept here so
-     * it can also be dropped into a field by hand.
+     * One asset, not three. The verse, its translation and its reference are
+     * shown together and are useless apart, so they are stored together and
+     * inserted into an invitation in one go — this used to be an Arabic row
+     * and an English row with nothing recording that they were the same verse.
      */
     private function verses(): void
     {
-        $verses = [
+        Asset::updateOrCreate(
+            ['kind' => Asset::KIND_VERSE, 'name' => 'Ar-Rum 30:21'],
             [
-                'name' => 'Ar-Rum 30:21',
-                'locale' => 'ar',
-                'body' => 'وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا لِّتَسْكُنُوا إِلَيْهَا وَجَعَلَ بَيْنَكُم مَّوَدَّةً وَرَحْمَةً',
+                'base_template' => null,
+                'field' => null,
+                'locale' => null,
                 'description' => 'The verse the invitation pages open with.',
-            ],
-            [
-                'name' => 'Ar-Rum 30:21 — English',
-                'locale' => 'en',
-                'body' => '“And among His signs is that He created for you mates from among yourselves, '
-                    .'that you may find tranquility in them; and He has placed between you affection and mercy.”',
-                'description' => 'Translation, for the English link.',
-            ],
-        ];
+                'body' => 'وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا '
+                    .'لِّتَسْكُنُوا إِلَيْهَا وَجَعَلَ بَيْنَكُم مَّوَدَّةً وَرَحْمَةً',
+                'translation' => [
+                    // Arabic and Kurdish show none: the verse already reads.
+                    'en' => '“And among His signs is that He created for you mates from among yourselves, '
+                        .'that you may find tranquility in them; and He has placed between you affection and mercy.”',
+                ],
+                'reference' => [
+                    'ar' => 'سورة الروم — ٢١',
+                    'ku' => 'سورەتی الروم — ٢١',
+                    'en' => 'QURAN 30:21',
+                ],
+                'is_active' => true,
+            ]
+        );
 
-        foreach ($verses as $verse) {
-            Asset::updateOrCreate(
-                ['kind' => Asset::KIND_TEXT, 'name' => $verse['name']],
-                [
-                    'base_template' => null,
-                    'field' => 'verse',
-                    'locale' => $verse['locale'],
-                    'body' => $verse['body'],
-                    'description' => $verse['description'],
-                    'is_active' => true,
-                ]
-            );
-        }
+        // The two text rows this replaces, if an earlier seed left them.
+        Asset::where('kind', Asset::KIND_TEXT)
+            ->where('name', 'Ar-Rum 30:21 — English')
+            ->delete();
     }
 
     /**

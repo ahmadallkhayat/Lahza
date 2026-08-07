@@ -32,6 +32,13 @@ export default function invitationForm(config) {
         // them one box rather than one per language.
         arabicFields: config.arabicFields ?? [],
 
+        // Slot groups — a verse and its parts — and the library assets that
+        // fill one in a single click.
+        groups: config.groups ?? {},
+        groupAssets: config.groupAssets ?? {},
+        groupPicked: config.groupPicked ?? {},
+        groupNotes: config.groupNotes ?? {},
+
         picked: config.picked,
         assetNote: config.notes,
 
@@ -282,6 +289,56 @@ export default function invitationForm(config) {
 
             this.assetNote[field] = asset.name + ' → ' + (this.labels[target] ?? target);
             this.picked[field] = '';
+        },
+
+        /**
+         * Fill a whole slot group from one library asset.
+         *
+         * A verse arrives with its translation and its reference attached, so
+         * one Insert writes all three fields rather than the studio finding
+         * three separate blocks and trusting they belong to the same verse.
+         *
+         * Which part of the asset lands in which slot is declared by the
+         * design, not inferred from the names here — see the group's `fills`.
+         * Everything stays editable afterwards; this is a starting point.
+         */
+        insertGroup(groupKey) {
+            const id = this.groupPicked[groupKey];
+            if (! id) return;
+
+            const group = this.groups[groupKey];
+            const asset = (this.groupAssets[groupKey] ?? [])
+                .find(a => String(a.id) === String(id));
+
+            if (! group || ! asset) return;
+
+            let filled = 0;
+
+            for (const [slot, part] of Object.entries(group.fills ?? {})) {
+                if (! this.text[slot]) continue;
+
+                const value = asset[part];
+
+                if (typeof value === 'string') {
+                    // One value for every language — the verse itself.
+                    this.text[slot][this.def] = value;
+                    if (value) filled++;
+
+                    continue;
+                }
+
+                // Keyed by language. Every language is written, blank included,
+                // so a leftover from a previous insert cannot survive under a
+                // language the new verse says nothing about.
+                for (const code of Object.keys(this.labels)) {
+                    this.text[slot][code] = value?.[code] ?? '';
+                    if (value?.[code]) filled++;
+                }
+            }
+
+            this.groupNotes[groupKey] = asset.name + ' inserted — '
+                + filled + (filled === 1 ? ' field' : ' fields') + ' filled.';
+            this.groupPicked[groupKey] = '';
         },
 
         async translateFromEnglish() {

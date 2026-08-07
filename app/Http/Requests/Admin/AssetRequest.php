@@ -81,10 +81,24 @@ class AssetRequest extends FormRequest
             return $rules;
         }
 
-        // Text. 4000 rather than 1000: a verse with its translation beneath it
-        // runs long, and this is the one field with no other ceiling on it.
+        // Written kinds. 4000 rather than 1000: a verse with its translation
+        // beneath it runs long, and this is the one field with no other
+        // ceiling on it.
         $rules['body'] = ['required', 'string', 'max:4000'];
         $rules['locale'] = ['nullable', Rule::in(array_keys(config('templates.locales')))];
+
+        if ($this->kind() === Asset::KIND_VERSE) {
+            // A verse carries its translation and its reference, both per
+            // language. Stray keys are dropped in cleaned(), which keeps only
+            // real locales — so the rules only have to bound the values.
+            $rules['translation'] = ['array'];
+            $rules['translation.*'] = ['nullable', 'string', 'max:4000'];
+            $rules['reference'] = ['array'];
+            $rules['reference.*'] = ['nullable', 'string', 'max:255'];
+
+            return $rules;
+        }
+
         $rules['field'] = ['nullable', Rule::in(array_keys(Asset::textFields()))];
 
         return $rules;
@@ -129,13 +143,46 @@ class AssetRequest extends FormRequest
             $data['body'] = null;
             $data['locale'] = null;
             $data['field'] = null;
+            $data['translation'] = null;
+            $data['reference'] = null;
+        } elseif ($kind === Asset::KIND_VERSE) {
+            // A verse is Arabic, as it is on the page, and is filed under
+            // nothing — being a verse is the whole of what it is for.
+            $data['locale'] = null;
+            $data['field'] = null;
+            $data['translation'] = $this->perLocale($data['translation'] ?? []);
+            $data['reference'] = $this->perLocale($data['reference'] ?? []);
         } else {
             $data['locale'] = filled($data['locale'] ?? null) ? $data['locale'] : null;
             $data['field'] = filled($data['field'] ?? null) ? $data['field'] : null;
+            $data['translation'] = null;
+            $data['reference'] = null;
         }
 
         unset($data['file']);
 
         return $data;
+    }
+
+    /**
+     * Keep only real languages with something written in them, so an untouched
+     * language is absent rather than stored blank.
+     *
+     * @param  array<string, string|null>  $values
+     * @return array<string, string>|null
+     */
+    private function perLocale(array $values): ?array
+    {
+        $kept = [];
+
+        foreach (array_keys(config('templates.locales')) as $locale) {
+            $value = trim((string) ($values[$locale] ?? ''));
+
+            if ($value !== '') {
+                $kept[$locale] = $value;
+            }
+        }
+
+        return $kept === [] ? null : $kept;
     }
 }

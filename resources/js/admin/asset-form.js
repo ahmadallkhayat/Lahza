@@ -41,6 +41,15 @@ export default function assetForm(config) {
             return this.kind === 'text';
         },
 
+        /**
+         * A religious verse: its own kind, with a translation and a reference
+         * beside the verse itself. Shares the body box with text, which is why
+         * both bind the same state.
+         */
+        get isVerse() {
+            return this.kind === 'verse';
+        },
+
         /** Direction for the body box — the text is written in one language. */
         get dir() {
             return this.locale && this.rtl[this.locale] ? 'rtl' : 'ltr';

@@ -22,6 +22,8 @@ class AssetFactory extends Factory
             'path' => null,
             'body' => 'تتشرف عائلة {groom} وعائلة {bride} بدعوتكم',
             'locale' => 'ar',
+            'translation' => null,
+            'reference' => null,
             'field' => 'hosts',
             'is_active' => true,
         ];
@@ -44,6 +46,19 @@ class AssetFactory extends Factory
             'kind' => Asset::KIND_MUSIC,
             'path' => '/storage/assets/music/'.Str::lower(Str::random(8)).'.mp3',
             'body' => null,
+            'locale' => null,
+            'field' => null,
+        ]);
+    }
+
+    /** A religious verse: the verse, its translation and its reference. */
+    public function verse(): static
+    {
+        return $this->state(fn () => [
+            'kind' => Asset::KIND_VERSE,
+            'body' => 'وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا',
+            'translation' => ['en' => 'And among His signs…'],
+            'reference' => ['ar' => 'سورة الروم — ٢١', 'en' => 'QURAN 30:21'],
             'locale' => null,
             'field' => null,
         ]);

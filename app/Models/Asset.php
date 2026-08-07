@@ -31,11 +31,20 @@ class Asset extends Model
 
     public const KIND_TEXT = 'text';
 
+    /**
+     * A religious verse: the verse, its translation and its reference, held
+     * together because they are shown together and are useless apart. Its own
+     * kind rather than text filed under a category, which made it three
+     * library rows to find and insert one at a time.
+     */
+    public const KIND_VERSE = 'verse';
+
     /** @var array<string, string> */
     public const KINDS = [
         self::KIND_VIDEO => 'Intro video',
         self::KIND_MUSIC => 'Music',
         self::KIND_TEXT => 'Text',
+        self::KIND_VERSE => 'Religious verse',
     ];
 
     /**
@@ -59,7 +68,11 @@ class Asset extends Model
         ],
         self::KIND_TEXT => [
             'icon' => 'document-text',
-            'blurb' => 'A verse, blessing or hosting line, with names filled in.',
+            'blurb' => 'A hosting line or other wording, with names filled in.',
+        ],
+        self::KIND_VERSE => [
+            'icon' => 'book-open',
+            'blurb' => 'A verse with its translation and reference, inserted as one.',
         ],
     ];
 
@@ -79,6 +92,8 @@ class Asset extends Model
         'description',
         'path',
         'body',
+        'translation',
+        'reference',
         'locale',
         'field',
         'is_active',
@@ -86,6 +101,8 @@ class Asset extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'translation' => 'array',
+        'reference' => 'array',
     ];
 
     /* ── scopes ───────────────────────────────────────────────────── */
@@ -156,6 +173,17 @@ class Asset extends Model
         return $this->kind === self::KIND_TEXT;
     }
 
+    public function isVerse(): bool
+    {
+        return $this->kind === self::KIND_VERSE;
+    }
+
+    /** Kinds whose content is written rather than uploaded. */
+    public function isWritten(): bool
+    {
+        return $this->isText() || $this->isVerse();
+    }
+
     public function kindLabel(): string
     {
         return self::KINDS[$this->kind] ?? $this->kind;
@@ -179,6 +207,12 @@ class Asset extends Model
         return $this->isText() ? 'text:'.($this->field ?: '') : $this->kind;
     }
 
+    /** Whether this kind's section splits into one per category. */
+    private static function sectionsByCategory(string $kind): bool
+    {
+        return $kind === self::KIND_TEXT;
+    }
+
     /**
      * Every section the library can show, in reading order: the media kinds,
      * then one per text category, then anything filed under nothing.
@@ -192,38 +226,41 @@ class Asset extends Model
     {
         $sections = [];
 
+        // KINDS order throughout, with the text categories expanded in place
+        // of the single Text entry — so the page reads clips, tracks, the text
+        // categories, then verses, and never reshuffles.
         foreach (self::KINDS as $kind => $label) {
-            if ($kind === self::KIND_TEXT) {
+            $icon = self::KIND_META[$kind]['icon'];
+
+            if (! self::sectionsByCategory($kind)) {
+                $sections[$kind] = [
+                    'label' => $label,
+                    'icon' => $icon,
+                    'kind' => $kind,
+                    'field' => null,
+                ];
+
                 continue;
             }
 
-            $sections[$kind] = [
-                'label' => $label,
-                'icon' => self::KIND_META[$kind]['icon'],
+            foreach (self::textFields() as $field => $fieldLabel) {
+                $sections[$kind.':'.$field] = [
+                    'label' => $fieldLabel,
+                    'icon' => $icon,
+                    'kind' => $kind,
+                    'field' => $field,
+                ];
+            }
+
+            // Only drawn when something is in it: text written before it was
+            // clear what it was for.
+            $sections[$kind.':'] = [
+                'label' => 'Text — not filed',
+                'icon' => $icon,
                 'kind' => $kind,
                 'field' => null,
             ];
         }
-
-        $textIcon = self::KIND_META[self::KIND_TEXT]['icon'];
-
-        foreach (self::textFields() as $field => $label) {
-            $sections['text:'.$field] = [
-                'label' => $label,
-                'icon' => $textIcon,
-                'kind' => self::KIND_TEXT,
-                'field' => $field,
-            ];
-        }
-
-        // Last, and only drawn when something is in it: text written before it
-        // was clear what it was for.
-        $sections['text:'] = [
-            'label' => 'Text — not filed',
-            'icon' => $textIcon,
-            'kind' => self::KIND_TEXT,
-            'field' => null,
-        ];
 
         return $sections;
     }

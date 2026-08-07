@@ -30,14 +30,39 @@
         $contentFields[$key] = $meta + ['name' => $key, 'arabic' => false, 'hint' => null, 'rows' => null];
     }
 
-    foreach (\App\Support\ContentSlots::for($chosen?->base_template) as $key => $meta) {
-        $contentFields[$key] = [
-            'label' => $meta['label'] ?? $key,
-            'hint' => $meta['hint'] ?? null,
-            'rows' => $meta['rows'] ?? null,
-            'arabic' => (bool) ($meta['arabic'] ?? false),
-            'name' => "content[$key]",
-        ];
+    $normaliseSlot = fn (array $meta, string $key) => [
+        'label' => $meta['label'] ?? $key,
+        'hint' => $meta['hint'] ?? null,
+        'rows' => $meta['rows'] ?? null,
+        'arabic' => (bool) ($meta['arabic'] ?? false),
+        'name' => "content[$key]",
+    ];
+
+    foreach (\App\Support\ContentSlots::ungrouped($chosen?->base_template) as $key => $meta) {
+        $contentFields[$key] = $normaliseSlot($meta, $key);
+    }
+
+    // Grouped slots get a card of their own rather than a row in Content: a
+    // verse, its translation and its reference are one thing with three parts,
+    // and filled from one library asset instead of three.
+    $slotGroups = [];
+
+    foreach (\App\Support\ContentSlots::groups($chosen?->base_template) as $groupKey => $group) {
+        $fields = [];
+
+        foreach ($group['slots'] as $key => $meta) {
+            $fields[$key] = $normaliseSlot($meta, $key);
+        }
+
+        $slotGroups[$groupKey] = $group + ['fields' => $fields];
+    }
+
+    // The Content card shows the plain fields; each group gets its own card.
+    // State and validation cover both, so this split is presentational only.
+    $plainFields = $contentFields;
+
+    foreach ($slotGroups as $group) {
+        $contentFields += $group['fields'];
     }
 
     // Translation covers the per-language fields only. An Arabic-everywhere
@@ -93,6 +118,13 @@
         ->values()
         ->all();
 
+    // Library assets that fill a whole slot group in one go, keyed by the kind
+    // the group asks for. A verse arrives with its translation and reference
+    // attached, so inserting it fills all three fields at once.
+    $groupAssets = collect($slotGroups)
+        ->mapWithKeys(fn ($group, $key) => [$key => $groupAssets[$group['asset_kind']] ?? []])
+        ->all();
+
     // The meridiem word each language shows, so {time} resolves out here to
     // exactly what the invitation itself renders. ICU's own marker is a terse
     // "م", which is why these live in lang files rather than coming from Intl.
@@ -117,6 +149,10 @@
         'placeholders' => \App\Support\Placeholders::aliases(),
         'meridiem' => $meridiem,
         'arabicFields' => array_keys(array_filter($contentFields, fn ($f) => $f['arabic'])),
+        'groups' => collect($slotGroups)->map(fn ($g) => ['fills' => $g['fills'] ?? []])->all(),
+        'groupAssets' => $groupAssets,
+        'groupPicked' => array_fill_keys(array_keys($slotGroups), ''),
+        'groupNotes' => array_fill_keys(array_keys($slotGroups), ''),
         'picked' => array_fill_keys(array_keys($contentFields), ''),
         'notes' => array_fill_keys(array_keys($contentFields), ''),
     ]))"
@@ -228,6 +264,8 @@
 </x-ui.card>
 
 @include('admin.invitations._content-card')
+
+@include('admin.invitations._slot-group-card')
 
 <x-ui.card title="When" description="The countdown runs to this moment in the event's own timezone.">
     <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">

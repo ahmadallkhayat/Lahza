@@ -66,11 +66,16 @@ final class ContentSlots
     }
 
     /**
-     * Every slot any design declares, plus the core fields — the full set of
-     * things a text asset can be written for.
+     * Every ungrouped slot any design declares, plus the core fields — the
+     * full set of things a plain text asset can be written for.
+     *
+     * Grouped slots are left out on purpose. A verse, its translation and its
+     * reference are edited as one block and come from one library asset of
+     * their own kind, so offering them here as three separate places to file a
+     * block of text is exactly the split this grouping exists to undo.
      *
      * Keys can collide across designs, which is intended: two designs both
-     * declaring "verse" means one library of verses serves both.
+     * declaring "hosts" means one library of hosting lines serves both.
      *
      * @return array<string, string> key => label
      */
@@ -80,11 +85,63 @@ final class ContentSlots
 
         foreach (self::manifests() as $manifest) {
             foreach ($manifest['slots'] ?? [] as $key => $slot) {
+                if (filled($slot['group'] ?? null)) {
+                    continue;
+                }
+
                 $fields[$key] ??= $slot['label'] ?? $key;
             }
         }
 
         return $fields;
+    }
+
+    /**
+     * Slots a design declares that belong to no group — the ordinary fields,
+     * edited one per row in the content card.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function ungrouped(?string $baseTemplate): array
+    {
+        return array_filter(
+            self::for($baseTemplate),
+            fn ($slot) => blank($slot['group'] ?? null)
+        );
+    }
+
+    /**
+     * Slot groups a design declares, each with the slots that belong to it.
+     *
+     * A group is a set of fields shown together and edited together — and,
+     * where it names an `asset_kind`, filled together from one library asset.
+     *
+     * @return array<string, array{label: string, description: string|null, asset_kind: string|null, slots: array<string, array<string, mixed>>}>
+     */
+    public static function groups(?string $baseTemplate): array
+    {
+        $declared = self::manifests()[$baseTemplate]['groups'] ?? [];
+        $slots = self::for($baseTemplate);
+
+        $groups = [];
+
+        foreach ($declared as $key => $group) {
+            $members = array_filter($slots, fn ($slot) => ($slot['group'] ?? null) === $key);
+
+            // A group with nothing in it is a declaration nobody joined.
+            if ($members === []) {
+                continue;
+            }
+
+            $groups[$key] = [
+                'label' => $group['label'] ?? $key,
+                'description' => $group['description'] ?? null,
+                'asset_kind' => $group['asset_kind'] ?? null,
+                'slots' => $members,
+            ];
+        }
+
+        return $groups;
     }
 
     public static function has(?string $baseTemplate, string $key): bool

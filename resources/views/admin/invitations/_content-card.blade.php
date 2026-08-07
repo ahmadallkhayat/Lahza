@@ -58,7 +58,7 @@
 
     {{-- ── Text fields, one column per language ─────────────────────── --}}
     <div class="space-y-5">
-        @foreach ($contentFields as $field => $meta)
+        @foreach ($plainFields as $field => $meta)
             <div>
                 <x-ui.label>{{ $meta['label'] }}</x-ui.label>
                 @if ($meta['hint'])
