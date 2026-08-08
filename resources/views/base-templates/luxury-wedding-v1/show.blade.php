@@ -434,14 +434,15 @@ main.names-in:not(.revealed) .couple-section {
 }
 
 main.names-in:not(.revealed) .couple {
-  /* A very light scroll down */
-  transform: translateY(-24px);
-  /* Smooth and pro appearance, independent of video pixels */
+  /* Lifted to the center of the viewport so the names sit over the clip. */
+  transform: translateY(var(--lift, 0px));
+  /* Clean white with a soft shadow — legible over any footage without the
+     strobing that mix-blend-mode: difference caused on moving video. */
   color: #fff;
-  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5),
+               0 0 80px rgba(0, 0, 0, 0.25);
 }
 
-/* No lift for the rest of the names block. They appear at their final position and never move again. */
 .couple-section > .hosts,
 .couple-section > .rule {
   opacity: 0;
@@ -450,8 +451,13 @@ main.names-in:not(.revealed) .couple {
 main.revealed .couple-section > .hosts,
 main.revealed .couple-section > .rule { opacity: 1; }
 
-/* Long and soft: this one move is what the whole sequence is built around. */
-.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease), text-shadow 1.4s var(--ease-soft); }
+/* The one move: names glide from the centre of the clip to their home, color
+   fades from white to the page ink, shadow dissolves. Long and soft. */
+.couple {
+  transition: color 1.4s var(--ease-soft),
+              transform 1.6s var(--ease),
+              text-shadow 1.4s var(--ease-soft);
+}
 main > .couple-section { transition: opacity 1.1s var(--ease); }
 
 /* Phase two: the rest, staggered. The step is set per element from one place
@@ -1370,6 +1376,20 @@ curtain.addEventListener('click', () => {
 function showNames() {
     if (named) return;
     named = true;
+
+    // How far to lift the names so they sit in the middle of the clip.
+    //
+    // Measured now, before the class lands, because this reads the element
+    // where it will finally sit — the page is unscrolled and nothing is
+    // transformed yet, so its own box is the honest answer.
+    const names = content.querySelector('.couple');
+
+    if (names) {
+        const box = names.getBoundingClientRect();
+        const lift = (window.innerHeight / 2) - (box.top + box.height / 2);
+
+        content.style.setProperty('--lift', Math.round(lift) + 'px');
+    }
 
     content.classList.add('names-in');
 }
