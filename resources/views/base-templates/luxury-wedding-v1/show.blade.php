@@ -434,15 +434,14 @@ main.names-in:not(.revealed) .couple-section {
 }
 
 main.names-in:not(.revealed) .couple {
-  transform: translateY(var(--lift, 0px));
+  /* A very light scroll down */
+  transform: translateY(-24px);
+  /* Smooth and pro appearance, independent of video pixels */
+  color: #fff;
+  text-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
 }
 
-/* No lift. The names appear at their final position and never move again.
-   Centring them on the clip and then travelling them home meant that at the
-   moment the rest of the page arrived, the names slid down to meet it — the
-   jump. Everything above them still occupies its space while invisible, so
-   where they land during the clip is exactly where they stay. */
-
+/* No lift for the rest of the names block. They appear at their final position and never move again. */
 .couple-section > .hosts,
 .couple-section > .rule {
   opacity: 0;
@@ -452,23 +451,8 @@ main.revealed .couple-section > .hosts,
 main.revealed .couple-section > .rule { opacity: 1; }
 
 /* Long and soft: this one move is what the whole sequence is built around. */
-.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease); }
+.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease), text-shadow 1.4s var(--ease-soft); }
 main > .couple-section { transition: opacity 1.1s var(--ease); }
-
-/* The names inverted against the footage, so they stay legible whatever
-   passes behind them.
-
-   The gold ampersand is exempt: inverting it turns it a muddy cyan. It holds
-   its own colour and simply fades in with the rest. */
-main.blending .couple {
-  color: #fff;
-  mix-blend-mode: difference;
-}
-main.blending .couple .amp { mix-blend-mode: normal; }
-
-@supports not (mix-blend-mode: difference) {
-  main.blending .couple { color: var(--paper); mix-blend-mode: normal; }
-}
 
 /* Phase two: the rest, staggered. The step is set per element from one place
    rather than a rule per position — the old nth-child(1..8) list meant a ninth
@@ -1017,7 +1001,8 @@ footer {
 
 @if ($otherLocales->isNotEmpty())
     <nav id="langs" aria-label="{{ __('invitation.language') }}">
-        @foreach ($otherLocales as $other)
+        @foreach ($otherLocales as $otherLocale)
+            @php $other = (string) $otherLocale; @endphp
             <a
                 href="{{ $localeUrl($other) }}"
                 hreflang="{{ $other }}"
@@ -1386,18 +1371,7 @@ function showNames() {
     if (named) return;
     named = true;
 
-    // How far to lift the names so they sit in the middle of the clip.
-    //
-    // Measured now, before the class lands, because this reads the element
-    // bounds as they are and lifting it would change them.
-    if (intro && content) {
-        const box = content.querySelector('.couple-section').getBoundingClientRect();
-        const lift = (window.innerHeight / 2) - (box.top + box.height / 2);
-
-        content.style.setProperty('--lift', Math.round(lift) + 'px');
-    }
-
-    content.classList.add('blending', 'names-in');
+    content.classList.add('names-in');
 }
 
 /* Start the dissolve before the clip runs out so it fades while still in
@@ -1592,7 +1566,6 @@ function reveal() {
     Array.from(content.children).forEach((el, i) => el.style.setProperty('--i', i));
 
     content.classList.add('revealed');
-    setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
     if (muteBtn) muteBtn.classList.add('on');
     if (langs) langs.classList.add('on');
     settleMusic();
