@@ -1573,10 +1573,6 @@ function reveal() {
     startPetals();
     armScrollCue();
 
-    // Let the names run through the whole dissolve before losing what they blend
-    // against, so they come off blend mode and take their own colour.
-    setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
-
     // Let the clip run through the whole dissolve — pausing here is what
     // made it look like it stopped and then faded.
     setTimeout(() => {
