@@ -1351,8 +1351,15 @@ curtain.addEventListener('click', () => {
     if (intro) {
         intro.classList.add('playing');
         intro.muted = CONFIG.keepVideoAudioMs === 0;
-        intro.currentTime = 0;
-        intro.play().then(armSequence).catch(reveal);
+        if (intro.currentTime > 0.1) {
+            intro.currentTime = 0;
+        }
+        
+        // Give iOS Safari a tick to process the muted property change before playing,
+        // which prevents the bug where audio plays but the video frame is frozen.
+        setTimeout(() => {
+            intro.play().then(armSequence).catch(reveal);
+        }, 50);
     } else {
         // No clip: the names still lead, just on a timer rather than a duration.
         showNames();
@@ -1439,79 +1446,42 @@ function startPetals() {
     }, CONFIG.petalsMs);
 }
 
-/* ── the clip hands over ────────────────────────────────────────────
-   Called as the clip dissolves, never before it.
+/* ── the ambient backdrop ───────────────────────────────────────────
+   The clip again, reversed and slowed to almost nothing, blurred past
+   recognition. It is not there to be watched — it is there so the glass panels
+   have something moving to refract, which is what stops them looking like flat
+   translucent rectangles.
 
-   An earlier version blurred the footage a second ahead of the names, which
-   inverted the whole sequence: by the time the names arrived the video was
-   already gone, so what a guest saw was a blank page and then text sliding in.
-   The names belong *on* the clip while it is still playing and still sharp —
-   that is the moment the invitation is built around — and only once they are
-   there does it fade.
+   Reversed because forward playback loops with a visible jump back to the first
+   frame; reversed footage of a slow motion reads as continuous drift. */
+function startAmbient() {
+    // Motion is the entire point of this layer, so honouring the preference
+    // means not running it at all rather than running it faster.
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-   What remains underneath is the same footage blurred and faint, or the
-   palindrome encode where one exists, so the page keeps moving quietly. */
-function handOver() {
-    if (handedOver) return;
-    handedOver = true;
-
-    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    if (!intro) return;
-
-    if (still) {
-        // Motion is what the preference is about. Hold a soft frozen frame.
-        intro.classList.add('ambient');
-        intro.pause();
-
-        return;
-    }
-
-    if (ambient) {
-        /* The palindrome takes over: it runs forward then backward, so it never
-           cuts back to a first frame. Started before the intro is faded so the
-           two overlap and nothing blinks between them. */
-        ambient.muted = true;
-        ambient.loop = true;
-
-        ambient.play().then(() => {
-            ambient.classList.add('on');
-
-            // `handed`, which is what the stylesheet calls it. This said `done`
-            // and nothing styled that, so the sharp intro never faded: it sat at
-            // full opacity over the blurred loop, played once, and froze on its
-            // last frame behind the invitation. The clip looked stuck and the
-            // backdrop looked unblurred, because both were true.
-            intro.classList.add('handed');
-
-            watchVisibility(ambient);
-        }).catch(() => {
-            // No encode playable, so the intro stays on as the backdrop.
-            intro.classList.add('ambient');
-            watchVisibility(intro);
-        });
-
-        return;
-    }
-
-    // No palindrome encode. The intro itself softens into the backdrop and
-    // keeps looping — set while it is still running, so it wraps rather than
-    // stopping and restarting where anyone could see it.
-    intro.loop = true;
-    intro.classList.add('ambient');
-
-    if (intro.paused) {
-        intro.muted = true;
-        intro.play().catch(() => {});
-    }
-
-    watchVisibility(intro);
-}
-
-/* A video decoding behind a hidden tab is battery spent for no one. */
-function watchVisibility(layer) {
+    const layer = ambient ?? intro;
     if (!layer) return;
 
+    // The encoded loop is already slow, so it plays at its own speed.
+    // We don't artificially slow the intro fallback anymore because it stutters.
+    if (layer === ambient) {
+        layer.playbackRate = 1;
+    }
+    
+    layer.loop = true;
+    layer.muted = true;
+
+    // Without a reversed encode the intro clip stands in, blurred in place.
+    layer.classList.add(layer === intro ? 'ambient' : 'on');
+
+    layer.play().catch(() => {
+        // Refused, which costs nothing but the effect. Take the blur off so it
+        // does not sit there as a frozen smear.
+        layer.classList.remove('ambient', 'on');
+    });
+
+    // A video decoding behind a hidden tab is pure battery for no one's
+    // benefit, and phones background these aggressively anyway.
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) layer.pause();
         else layer.play().catch(() => {});
@@ -1630,12 +1600,17 @@ function reveal() {
     startPetals();
     armScrollCue();
 
-    // The clip dissolves on this same beat, and what it leaves behind is the
-    // quiet backdrop. One motion: names already up, footage going, content
-    // coming.
-    handOver();
+    // Let the names run through the whole dissolve before losing what they blend
+    // against, so they come off blend mode and take their own colour.
+    setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
 
-    setTimeout(() => curtain.remove(), CONFIG.crossfadeMs + 200);
+    // Let the clip run through the whole dissolve — pausing here is what
+    // made it look like it stopped and then faded.
+    setTimeout(() => {
+        if (intro) intro.pause();
+        curtain.remove();
+        startAmbient();
+    }, CONFIG.crossfadeMs + 200);
 }
 
 /* ── language switching ─────────────────────────────────────────
