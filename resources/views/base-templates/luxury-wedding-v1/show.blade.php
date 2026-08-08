@@ -276,8 +276,67 @@ body::before {
 #curtain.opened { background-color: transparent; }
 #curtain.gone { opacity: 0; pointer-events: none; }
 
-#prompt { position: relative; z-index: 2; text-align: center; transition: opacity 420ms var(--ease); }
-#prompt.gone { opacity: 0; }
+/* ─── LOADING ────────────────────────────────────────────────────
+   The mark, in the theme's colours, while the clip buffers. Both this and the
+   prompt live in the same grid cell so the swap is a crossfade rather than a
+   jump — and the prompt starts hidden, which is the whole point: it must not
+   be tappable before there is anything for a tap to start. */
+#loading, #prompt { grid-area: 1 / 1; }
+
+#loading {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: 1.6rem;
+  transition: opacity 500ms var(--ease-soft);
+}
+#loading.gone { opacity: 0; pointer-events: none; }
+
+#loading .mark {
+  width: clamp(3.4rem, 16vw, 4.6rem);
+  height: auto;
+  color: var(--gold);
+  opacity: .9;
+  animation: breathe-mark 2.4s var(--ease-soft) infinite;
+}
+
+@keyframes breathe-mark {
+  0%, 100% { opacity: .45; transform: scale(.97); }
+  50%      { opacity: .95; transform: scale(1); }
+}
+
+/* A thread rather than a progress bar: there is no percentage to report, only
+   the fact that something is happening. */
+#loading .pulse {
+  width: 5.5rem;
+  height: 1px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--gold) 22%, transparent);
+}
+#loading .pulse i {
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--gold);
+  animation: thread 1.5s var(--ease-soft) infinite;
+}
+
+@keyframes thread {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%); }
+}
+
+#prompt {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms var(--ease);
+}
+#prompt.ready { opacity: 1; pointer-events: auto; }
+#prompt.gone { opacity: 0; pointer-events: none; }
 
 .ring {
   width: 4.5rem; height: 4.5rem;
@@ -346,246 +405,6 @@ main > * {
    travels. The line above the names and the rule below them belong to the laid
    out page and arrive with it — lifting the whole block moved all three onto
    the clip, which is not what was asked for. */
-main.names-in:not(.revealed) .couple-section {
-  opacity: 1;
-  transform: none;
-}
-
-main.names-in:not(.revealed) .couple {
-  transform: translateY(var(--lift, 0px));
-}
-
-.couple-section > .hosts,
-.couple-section > .rule {
-  opacity: 0;
-  transition: opacity 1s var(--ease) 250ms;
-}
-main.revealed .couple-section > .hosts,
-main.revealed .couple-section > .rule { opacity: 1; }
-
-/* Long and soft: this one move is what the whole sequence is built around. */
-.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease); }
-main > .couple-section { transition: opacity 1.1s var(--ease); }
-
-/* Phase two: the rest, staggered. The step is set per element from one place
-   rather than a rule per position — the old nth-child(1..8) list meant a ninth
-   section silently got no delay at all, and nobody would notice until it sat
-   there motionless among eight that moved. */
-main.revealed > * {
-  opacity: 1;
-  transform: none;
-  transition-delay: calc(var(--i, 0) * 110ms);
-}
-
-@keyframes rise {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: none; }
-}
-
-/* The end time, quieter than the start it follows. */
-.at-time .until { color: var(--ink-soft); }
-
-/* ─── SCROLL CUE ─────────────────────────────────────────────────
-   The invitation runs well past one screen and nothing said so, which on a
-   phone means the names and the date can read as the whole of it. Fades out on
-   the first scroll — a cue that stays after being acted on is just decoration. */
-#more {
-  position: fixed;
-  inset-inline: 0;
-  bottom: 1.1rem;
-  z-index: 30;
-  display: grid;
-  place-items: center;
-  gap: .3rem;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 900ms var(--ease);
-}
-#more.on { opacity: .75; }
-
-#more svg {
-  width: 1.15rem;
-  height: 1.15rem;
-  stroke: var(--gold-deep);
-  stroke-width: 1.5;
-  fill: none;
-  animation: nudge 2.2s ease-in-out infinite;
-}
-
-@keyframes nudge {
-  0%, 100% { transform: translateY(0); opacity: .55; }
-  50%      { transform: translateY(5px); opacity: 1; }
-}
-
-/* ─── PETALS ─────────────────────────────────────────────────────
-   Above the invitation, below the curtain, and untouchable. They start with the
-   reveal and thin out after it: continuous fall is livelier for the first look,
-   but it never stops being motion in the corner of the eye, and someone reading
-   a programme should not be doing it in weather. */
-#petals {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  overflow: hidden;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 2.4s var(--ease-soft);
-}
-#petals.on { opacity: 1; }
-
-.petal {
-  position: absolute;
-  top: calc(var(--size) * -2);
-  left: var(--x);
-  width: var(--size);
-  height: var(--size);
-  animation: fall var(--dur) linear var(--delay) infinite;
-  will-change: transform;
-}
-
-/* The mask is what makes one file work in every colour: the shape comes from
-   the SVG, the colour from `background`. As an <img> it would need a copy per
-   tint, and the tints come from a palette that is different per template. */
-.petal i {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background: var(--tint);
-  opacity: .5;
-  -webkit-mask: url('{{ $petal }}') center / contain no-repeat;
-  mask: url('{{ $petal }}') center / contain no-repeat;
-  animation: sway calc(var(--dur) / 3) ease-in-out var(--delay) infinite alternate;
-  will-change: transform;
-}
-
-@keyframes fall {
-  from { transform: translateY(0); }
-  to   { transform: translateY(115vh); }
-}
-
-@keyframes sway {
-  from { transform: translateX(calc(var(--drift) * -1)) rotate(calc(var(--spin) * -1)); }
-  to   { transform: translateX(var(--drift)) rotate(var(--spin)); }
-}
-
-/* ─── GLASS ──────────────────────────────────────────────────────
-   Only panes get glass, and there are two of them.
-
-   Every section used to be one, which is what made the page read as a stack of
-   boxes: a venue is two lines and a hosting line is one, and neither fills a
-   card — they just sat in the middle of an empty pane looking accidental. So
-   the content is grouped into the two panes that have something to hold, and
-   the verse, the names and the actions sit on open paper where they belong.
-
-   The fill is `paper` at 62%, and that number is load-bearing. Every colour in
-   a generated palette is contrast-checked against solid `paper`, and a moving
-   image behind text voids that guarantee — whatever frame is passing decides
-   the ratio. Keeping the pane mostly paper holds the measured contrast to
-   within a few percent of what was promised. Thinner glass looks better in a
-   screenshot and fails on a bright frame. */
-section { margin-block: 2.6rem; }
-
-.pane {
-  position: relative;
-  padding: 2.2rem 1.6rem;
-  border-radius: 1.75rem;
-  background: color-mix(in srgb, var(--paper) 72%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
-  box-shadow:
-    0 1px 0 color-mix(in srgb, #fff 45%, transparent) inset,
-    0 22px 50px -28px color-mix(in srgb, var(--curtain) 55%, transparent);
-}
-
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .pane {
-    -webkit-backdrop-filter: blur(20px) saturate(1.3);
-    backdrop-filter: blur(20px) saturate(1.3);
-    background: color-mix(in srgb, var(--paper) 62%, transparent);
-  }
-}
-
-/* Separates the two halves of a pane without implying a new card. */
-.divide {
-  height: 1px;
-  margin: 1.9rem auto;
-  max-width: 8rem;
-  background: linear-gradient(
-    to right,
-    transparent,
-    color-mix(in srgb, var(--gold) 45%, transparent),
-    transparent
-  );
-}
-
-main > .couple-section {
-  transition:
-    opacity 900ms ease,
-    transform 900ms ease,
-    background-color 1.2s ease,
-    border-color 1.2s ease;
-}
-
-.label {
-  font-size: .84rem;
-  letter-spacing: calc(.26em * var(--tk));
-  color: var(--ink-soft);
-  margin: 0 0 .7rem;
-  font-weight: 400;
-}
-
-/* Verse: Arabic always, translation beneath it when present.
-   Bold and set larger than anything but the names — it opens the invitation and
-   was reading as a caption. Amiri ships a 700 weight, so this is the real face
-   rather than a browser-synthesised smear. */
-.verse-ar {
-  font-family: var(--f-serif);
-  font-size: clamp(1.2rem, 4.8vw, 1.42rem);
-  font-weight: 700;
-  line-height: 2.1;
-  color: var(--gold-deep);
-  margin: 0 auto;
-  max-width: 25rem;
-}
-.verse-en {
-  font-family: var(--f-latin);
-  font-style: italic;
-  font-size: 1rem;
-  line-height: 1.85;
-  color: var(--ink-soft);
-  margin: 1rem auto 0;
-  max-width: 23rem;
-}
-.verse cite {
-  display: block;
-  font-family: var(--f-ui);
-  font-style: normal;
-  font-size: .8rem;
-  letter-spacing: calc(.2em * var(--tk));
-  color: var(--ink-soft);
-  margin-top: 1rem;
-}
-
-.hosts {
-  font-family: var(--f-serif);
-  font-size: 1.1rem;
-  line-height: 2;
-  color: var(--ink-soft);
-  margin: 0 auto;
-  max-width: 23rem;
-}
-html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.18rem; line-height: 1.85; }
-
-/* Couple names — Arabic in every locale. */
-.couple {
-  margin: 0;
-  font-family: var(--f-name);
-  font-size: clamp(2.5rem, 13vw, 3.9rem);
-  /* Ruqaa throws swashes well above the baseline; leading stops clipping. */
-  line-height: 1.7;
-  color: var(--ink);
-  font-weight: 400;
-}
-
 /* ── Names over the clip ─────────────────────────────────────────
    One colour, all the way through.
 
@@ -819,15 +638,22 @@ main > .couple-section {
   margin-top: 1rem;
 }
 
+/* The line that introduces the couple, and it reads as a headline now.
+   It has been nudged twice from .98 and neither move was perceptible; a tenth
+   of a rem is not a size change. Set above the verse deliberately: the verse is
+   a quotation and this is the invitation speaking. */
 .hosts {
   font-family: var(--f-serif);
-  font-size: 1.1rem;
-  line-height: 2;
-  color: var(--ink-soft);
+  font-size: clamp(1.3rem, 5.2vw, 1.62rem);
+  font-weight: 400;
+  line-height: 1.95;
+  /* Full ink, not the soft grey it had. At headline size the muted colour was
+     the other half of why it receded. */
+  color: var(--ink);
   margin: 0 auto;
   max-width: 23rem;
 }
-html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.18rem; line-height: 1.85; }
+html[lang="en"] .hosts { font-family: var(--f-latin); font-size: clamp(1.35rem, 5.4vw, 1.7rem); line-height: 1.8; }
 
 /* Couple names — Arabic in every locale. */
 .couple {
@@ -1101,6 +927,18 @@ footer {
 </div>
 
 <div id="curtain">
+    {{-- Shown until the clip can actually play.
+         The prompt used to appear the moment the markup did, so a guest on a
+         slow connection tapped a button that could not do anything yet —
+         play() was called against an unbuffered video and the tap was simply
+         lost. The mark holds the moment instead, in the theme's own colours. --}}
+    <div id="loading">
+        <svg class="mark" fill="currentColor" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 710 703">
+<path d="M354.21 11.77C354.89 11.57 355.16 13.71 355.33 14.24C356.26 17.05 356.48 20.03 357.32 22.86C359.44 30.06 362.47 37.16 366.49 43.52C370.45 49.79 376.47 55.06 382.92 58.58C384.15 59.25 391.5 62.14 391.66 62.85C391.96 64.19 384.09 66.43 382.54 67.18C377.2 69.75 372.25 73.89 368.29 78.25C363.32 83.72 359.51 91.09 357 97.99C356.63 99.03 354.74 105.3 354.41 105.34C353.54 105.44 353.19 103.86 353.07 103.31C352.48 100.72 351.7 98.22 350.8 95.71C348.8 90.14 345.34 83.93 341.47 79.44C337.03 74.28 331.52 69.98 325.32 67.16C324.17 66.63 316.59 63.99 316.41 63.51C316.01 62.39 317.48 62.03 318.21 61.79C320.64 61 323.14 59.78 325.38 58.54C331.32 55.27 336.39 50.9 340.43 45.42C345.68 38.31 348.92 29.34 351.44 20.96C351.8 19.76 353.39 12.02 354.21 11.77ZM326.29 125.17C327.75 124.8 327.05 131.63 326.88 132.65C325.54 140.49 323.64 148.13 320.87 155.59C317.82 163.83 313.2 171.49 308.43 178.84C298.22 194.56 286.2 208.25 273.19 221.71C251.61 244 228.16 264.45 205.67 285.78C192.37 298.4 178.5 310.67 167.24 325.22C148.39 349.55 137.5 377.1 137.65 408.13C137.82 443.32 153.95 475.95 176.43 502.21C187.54 515.19 200.53 526.43 212.96 538.11C224.99 549.41 237.4 560.39 249.62 571.49C258.78 579.8 268.31 587.85 277.07 596.58C296.35 615.79 321.42 636.02 333.41 660.7C336.28 666.61 335.31 676.6 335.3 683.14C335.3 684.09 335.43 689.83 334.49 690.06C333.73 690.25 333.03 688.81 332.76 688.34C331.54 686.27 330.21 684.26 328.93 682.24C323.55 673.75 316.76 666.41 309.74 659.29C298.1 647.49 285.18 636.94 272.94 625.8C262.85 616.62 252.45 607.8 242.27 598.73C234.69 591.98 227.4 584.84 219.67 578.26C211.81 571.57 204.01 564.71 196.38 557.77C194.07 555.67 191.97 553.3 189.59 551.3C174.34 538.48 159.65 524.51 147.42 508.75C125.24 480.16 111.69 444.7 111.22 408.37C111.04 394.73 112.4 381.8 115.66 368.58C119.46 353.19 125.81 338.25 134.13 324.77C146.52 304.71 163.28 288.52 180.4 272.58C195.96 258.09 211.79 243.86 227.32 229.33C232.66 224.34 238.32 219.67 243.54 214.54C264.47 193.97 287.9 175.44 306.58 152.63C311.91 146.13 316.94 139.6 321.53 132.55C322.23 131.47 325.41 125.39 326.29 125.17ZM382.38 125.15C383.32 124.68 384.65 127.56 384.98 128.22C387.02 132.28 389.62 136.18 392.35 139.8C399.68 149.52 407.69 158.83 416.16 167.58C430.74 182.63 446.38 197 462.07 210.89C473.4 220.92 484.14 231.6 495.4 241.69C504.89 250.19 514.05 259.05 523.52 267.54C542.23 284.3 559.86 301.73 573.93 322.67C582.86 335.96 589.12 351.15 593.23 366.55C596.89 380.24 598.46 393.93 598.02 408.13C597.54 423.4 595.46 438.44 590.86 453.03C576.67 497.99 547.87 527.1 513.3 557.21C496.75 571.62 480.64 586.57 464.23 601.14C450.73 613.13 436.97 624.84 423.58 636.94C413.2 646.32 402.42 655.1 392.82 665.34C387.19 671.34 382.02 677.43 377.35 684.21C376.63 685.25 373.59 691.05 372.62 691.04C371.47 691.03 371.88 684.9 371.9 683.85C372.03 676.63 370.95 667.83 374.18 661.14C380.25 648.54 389.88 638.4 399.48 628.45C409.72 617.85 420.29 607.6 431.02 597.51C450.53 579.14 470.72 561.48 490.31 543.2C506.49 528.11 523.51 513.68 537.5 496.45C557.25 472.14 569.66 442.83 571.4 411.45C573.15 379.68 561.15 349.27 541.65 324.66C533.65 314.57 524.24 305.8 515.04 296.84C493.03 275.38 469.73 255.26 448.08 233.4C438.03 223.26 427.38 213.67 418.27 202.63C408.93 191.31 399.57 179.3 393.06 166.06C389.94 159.69 387.82 153.18 385.27 146.62C383.27 141.5 382.88 135.94 382.26 130.52C382.17 129.72 381.69 125.49 382.38 125.15ZM354.22 208.3C355.4 208.04 356.02 211.02 356.32 211.8C357.89 215.85 360.03 219.84 362.36 223.5C368.88 233.72 376.24 243.6 384.32 252.67C403.59 274.26 423.94 296.21 431.86 324.86C438.11 347.5 435.92 373.84 435.91 397.25C435.91 403.4 435.87 409.55 435.82 415.7C435.79 418.61 436.33 422.17 435.17 424.92C434.31 426.96 432.04 428.8 430.57 430.45C426.51 435.03 422.06 439.38 418.37 444.26C415.81 447.64 413.22 450.97 410.73 454.39C410.05 455.32 408.85 457.67 407.56 457.82C406.42 457.95 406.63 455.33 406.63 454.76C406.63 451.13 406.62 447.49 406.67 443.87C406.86 428.65 406.68 413.41 406.68 398.19C406.68 379.82 408.54 354.96 403.64 337.47C398.34 318.51 386.74 302.56 373.86 287.97C369.05 282.52 363.98 277 359.78 271.05C359.07 270.05 355.36 265 354.41 264.95C353.16 264.89 349.9 269.68 349.01 270.8C344.17 276.89 339.04 282.74 333.99 288.67C320.99 303.93 309.51 320.07 304.43 339.76C302.34 347.9 302.39 356.71 302.27 365.06C302.09 376.49 302.08 387.94 302.19 399.38C302.3 412.23 302.16 425.09 302.18 437.95C302.18 443 302.21 448.05 302.1 453.1C302.07 454.22 302.36 458.18 300.29 457.16C298.75 456.4 297.64 454.07 296.66 452.74C294.46 449.73 292 446.79 289.63 443.91C286.12 439.65 282.64 435.29 278.81 431.31C276.9 429.33 274.02 427.46 273.04 424.76C271.88 421.58 272.69 417.15 272.66 413.81C272.6 405.61 272.58 397.4 272.58 389.2C272.58 367.47 271.31 345.59 276.98 324.4C284.68 295.65 307.03 271.09 326.68 249.65C334.62 240.99 342.26 230.95 347.78 220.58C349.41 217.52 350.84 214.49 352.27 211.33C352.65 210.5 353.17 208.53 354.22 208.3ZM179.8 402.41C181.79 401.69 188.43 404.9 190.63 405.66C201.39 409.37 211.89 413.73 222.18 418.6C227.35 421.04 232.66 423.24 237.63 426.11C277.97 449.38 305.75 479.43 327.89 520.18C335.2 533.64 342.7 549.94 347.96 564.3C349.32 568.01 351.07 571.65 352.22 575.43C352.48 576.3 352.86 578.93 353.94 578.97C354.97 579.01 354.98 577.6 355.23 576.87C356.08 574.45 357.08 572.09 357.98 569.69C361.75 559.66 365.98 549.82 370.11 539.92C374.34 529.78 379.83 519.81 385.63 510.48C393.47 497.86 401.21 485.34 411.05 474.12C434.77 447.12 464.26 427.68 497.12 413.46C504.77 410.15 512.7 407.6 520.46 404.6C522.17 403.94 527.01 401.53 528.64 402.76C529.93 403.74 529.46 409.8 529.44 411.45C529.4 417.12 529.31 422.81 529.36 428.49C529.4 431.42 529.81 434.57 529.48 437.48C529.12 440.52 520.2 440.49 517.46 441.39C513.32 442.75 509.1 443.74 505.01 445.27C497.23 448.19 489.45 452.17 482.26 456.35C453.31 473.17 428.77 496.55 411.2 525.15C391.33 557.51 378.48 593.62 366.41 629.42C363.54 637.93 359.95 646.2 357.17 654.75C356.79 655.93 354.7 662.63 353.49 662.4C352.74 662.27 352.26 660.6 352.07 660.01C351.26 657.48 350.61 654.85 349.48 652.44C347.97 649.19 346.96 645.6 345.74 642.21C343.02 634.67 340.33 627.14 337.6 619.6C328.05 593.22 318.93 566.22 305.81 541.35C298.13 526.81 288.99 513.28 278.84 500.37C261.98 478.93 236.95 461.06 212.57 449.29C205.62 445.94 198.26 443.01 190.73 441.27C188.04 440.65 181.44 440.61 179.52 439.02C178.02 437.78 178.82 433.35 178.83 431.56C178.84 424.54 178.88 417.52 178.8 410.5C178.78 408.76 177.67 403.18 179.8 402.41Z" fill="currentColor" fill-rule="evenodd" stroke="currentColor" stroke-width="0.25" stroke-linejoin="round"/>
+</svg>
+        <div class="pulse"><i></i></div>
+    </div>
+
     <div id="prompt">
         <div class="ring"><span></span></div>
         <p>{{ __('invitation.tap') }}</p>
@@ -1288,6 +1126,7 @@ const intro    = document.getElementById('intro');
 const ambient  = document.getElementById('ambient');
 const petals   = document.getElementById('petals');
 const promptEl = document.getElementById('prompt');
+const loading  = document.getElementById('loading');
 const music    = document.getElementById('music');
 const content  = document.getElementById('content');
 const muteBtn  = document.getElementById('mute');
@@ -1430,10 +1269,49 @@ function release() {
 
 hold();
 
+/* ── waiting for the clip ───────────────────────────────────────────
+   The prompt appears when there is something a tap can start, not when the
+   markup arrives. Before this, a guest on a slow connection tapped and nothing
+   happened: play() was called against an unbuffered video, the promise
+   rejected, and the tap was spent for nothing.
+
+   `canplay` rather than `canplaythrough` — through means the browser predicts
+   the whole clip will play without stalling, which on a phone connection it
+   often never commits to. Enough to start is enough, since the sequence is
+   driven by timeupdate and copes with a stall anyway. */
+let armed = false;
+
+function armPrompt() {
+    if (armed) return;
+    armed = true;
+
+    if (loading) loading.classList.add('gone');
+    promptEl.classList.add('ready');
+}
+
+if (!intro) {
+    // No clip to wait for.
+    armPrompt();
+} else if (intro.readyState >= 3) {
+    // Already buffered — a cached clip is ready before this script runs.
+    armPrompt();
+} else {
+    intro.addEventListener('canplay', armPrompt, { once: true });
+    intro.addEventListener('loadeddata', armPrompt, { once: true });
+
+    // Never leave someone looking at the mark. If the clip cannot be reached
+    // the tap still has to work; the sequence already handles a failed play().
+    intro.addEventListener('error', armPrompt, { once: true });
+    setTimeout(armPrompt, CONFIG.loaderTimeoutMs);
+}
+
 curtain.addEventListener('click', () => {
+    // Nothing to open until the clip can start.
+    if (!armed) return;
     if (opened) return;
     opened = true;
 
+    promptEl.classList.remove('ready');
     promptEl.classList.add('gone');
     // Clears the scrim so the clip beneath shows; the curtain itself stays
     // until the reveal so nothing below it can be touched yet.
@@ -1578,6 +1456,14 @@ function softenBackdrop() {
 
             return;
         }
+
+        // It is normally already running by now, but not when the invitation
+        // was opened without an intro at all — a language switch arrives here
+        // with nothing playing, and a paused first frame is not a backdrop.
+        if (intro.paused) {
+            intro.muted = true;
+            intro.play().catch(() => {});
+        }
     }
 
     if (still || !ambient) return;
@@ -1661,14 +1547,28 @@ function armSequence() {
  * being consumed by its own lead times.
  */
 function cues(d) {
-    const back = ms => d - ms / 1000;
+    /* The leads are measured back from the end, which is right whenever the
+       clip is long enough to hold them. When it is not, they are scaled down
+       together rather than each being given a floor of its own.
 
-    const soften = Math.max(d * 0.42, back(CONFIG.namesLeadMs + CONFIG.blurLeadMs));
-    const names = Math.max(d * 0.62, back(CONFIG.namesLeadMs));
+       Floors were the first attempt and they were worse: pinning the soften to
+       42% of the clip meant a five-second intro went blurred barely two seconds
+       in, so the footage looked like it had finished early and the names landed
+       at the very end. Scaling keeps the shape of the sequence — sharp, then
+       names, then the rest — and only compresses it.
 
-    // And the reveal always trails the names, however tight the clip — the
-    // whole point is that the names have it to themselves for a moment.
-    const reveal = Math.max(names + 0.6, back(CONFIG.fadeOutLeadMs));
+       The cap is the important number. Whatever the duration, the leads never
+       take more than this share, so at least the rest of the clip plays sharp. */
+    const want = (CONFIG.namesLeadMs + CONFIG.blurLeadMs) / 1000;
+    const scale = want > 0 ? Math.min(1, (d * 0.35) / want) : 1;
+
+    const back = ms => d - (ms / 1000) * scale;
+
+    const soften = back(CONFIG.namesLeadMs + CONFIG.blurLeadMs);
+    const names = back(CONFIG.namesLeadMs);
+
+    // The names always keep the clip to themselves for a beat, however tight.
+    const reveal = Math.max(names + 0.5, back(CONFIG.fadeOutLeadMs));
 
     return { soften, names, reveal };
 }
@@ -1738,14 +1638,29 @@ if (langs) {
     });
 }
 
+/**
+ * Arrive with the invitation already open.
+ *
+ * This used to be its own copy of what reveal() does, and it fell behind it —
+ * it never released the scroll lock, so switching language left a page that
+ * could not be scrolled at all, and it missed the petals, the scroll cue and
+ * the backdrop besides. Two lists of the same steps only stay in step until
+ * one of them is edited.
+ *
+ * So it marks the beats that need no playing-out as already done and hands over
+ * to the real thing, which is the only place that knows what revealing means.
+ */
 function skipIntro() {
-    revealed = true;
     opened = true;
 
-    curtain.remove();
-    content.classList.add('revealed');
-    if (muteBtn) muteBtn.classList.add('on');
-    if (langs) langs.classList.add('on');
+    // No clip to centre on and none to blur out of, so neither beat has
+    // anything to do — but they must be marked done or reveal() will run them.
+    named = true;
+
+    curtain.classList.add('gone');
+    softenBackdrop();
+
+    reveal();
 }
 
 try {

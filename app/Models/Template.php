@@ -32,6 +32,10 @@ class Template extends Model
         'duckTo' => 0.42,
         'fogHz' => 700,
         'duckMs' => 2600,
+        // Longest the mark holds before the prompt appears regardless. A clip
+        // that cannot be reached must not leave a guest waiting on a spinner.
+        'loaderTimeoutMs' => 8000,
+
         'revealFallbackMs' => 13000,
     ];
 

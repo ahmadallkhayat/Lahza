@@ -34,6 +34,28 @@ class OgImageGenerator
 
     private const HEIGHT = 630;
 
+    /** Where the hairline frame sits. */
+    private const FRAME_INSET = 40;
+
+    /**
+     * Clear space between that frame and any text.
+     *
+     * drawtext neither wraps nor shrinks — it draws at the size given and lets
+     * the result run off the edge — so a long pair of names went straight
+     * through the frame. Nothing here is centred-and-hoped: the size is
+     * measured down until it fits inside this margin.
+     */
+    private const SAFE_PADDING = 56;
+
+    /** Largest and smallest the names are allowed to be. */
+    private const NAME_MAX = 104;
+
+    private const NAME_MIN = 44;
+
+    private const DATE_MAX = 42;
+
+    private const DATE_MIN = 24;
+
     /**
      * Faces `fonts:fetch` downloads as whole TTFs for this renderer.
      *
@@ -73,6 +95,14 @@ class OgImageGenerator
         $soft = $this->hex($palette['ink_soft'] ?? '#6b5648');
         $rule = $this->hex($palette['gold'] ?? '#a8874f');
 
+        $face = $this->face('Amiri');
+        $date = $invitation->formattedDate();
+
+        // Sized to fit before anything is drawn, since drawtext will happily
+        // run a long line straight through the frame and off the canvas.
+        $nameSize = $this->fit($names, $face, self::NAME_MAX, self::NAME_MIN);
+        $dateSize = $this->fit($date, $face, self::DATE_MAX, self::DATE_MIN);
+
         $relative = 'invitations/og/'.$invitation->slug.'-'.Str::lower(Str::random(8)).'.jpg';
         $target = Storage::disk('public')->path($relative);
 
@@ -80,7 +110,7 @@ class OgImageGenerator
 
         // Written per render and removed after: ffmpeg reads them, nothing else.
         $nameFile = $this->scratch($names);
-        $dateFile = $this->scratch($invitation->formattedDate());
+        $dateFile = $this->scratch($date);
 
         try {
             // Run from the font directory and refer to everything by bare
@@ -96,7 +126,9 @@ class OgImageGenerator
                 '-i', 'color=c='.$paper.':s='.self::WIDTH.'x'.self::HEIGHT,
                 '-vf', implode(',', [
                     // A hairline frame just inside the edge.
-                    'drawbox=x=40:y=40:w='.(self::WIDTH - 80).':h='.(self::HEIGHT - 80)
+                    'drawbox=x='.self::FRAME_INSET.':y='.self::FRAME_INSET
+                        .':w='.(self::WIDTH - 2 * self::FRAME_INSET)
+                        .':h='.(self::HEIGHT - 2 * self::FRAME_INSET)
                         .':color='.$rule.'@0.45:t=2',
 
                     // The names, a little above centre to leave the date room.
@@ -104,7 +136,7 @@ class OgImageGenerator
                         .':fontfile='.self::FACES['Amiri']
                         .':text_shaping=1'
                         .':fontcolor='.$ink
-                        .':fontsize=104'
+                        .':fontsize='.$nameSize
                         .':x=(w-text_w)/2:y=(h-text_h)/2-56',
 
                     'drawbox=x=(iw-140)/2:y=ih/2+72:w=140:h=1:color='.$rule.'@0.7:t=fill',
@@ -113,7 +145,7 @@ class OgImageGenerator
                         .':fontfile='.self::FACES['Amiri']
                         .':text_shaping=1'
                         .':fontcolor='.$soft
-                        .':fontsize=42'
+                        .':fontsize='.$dateSize
                         // drawtext exposes the frame as w/h. iw/ih are
                         // drawbox's names for it and are a parse error here.
                         .':x=(w-text_w)/2:y=h/2+112',
@@ -195,6 +227,46 @@ class OgImageGenerator
         File::put($path, $text);
 
         return $path;
+    }
+
+    /**
+     * The largest size at which a line still fits the safe area.
+     *
+     * Measured with GD rather than guessed from a character count, because
+     * "أَحْمَد" and "عَبْد الرَّحْمَن" are nothing like the same width and a
+     * per-character estimate is wrong for both.
+     *
+     * GD cannot *shape* Arabic — that is the whole reason ffmpeg draws this —
+     * but imagettfbbox still sums the advances of the glyphs it is given, and
+     * that sum is a fair measure of the line. It errs high, since joined
+     * letterforms are narrower than isolated ones, so anything it accepts as
+     * fitting genuinely fits. Erring small is the harmless direction.
+     *
+     * Width scales linearly with point size, so one measurement is enough to
+     * solve for the size rather than searching for it.
+     */
+    private function fit(string $text, string $face, int $max, int $min): int
+    {
+        $available = self::WIDTH - 2 * (self::FRAME_INSET + self::SAFE_PADDING);
+
+        if (! function_exists('imagettfbbox')) {
+            // No measuring available. Assume the worst rather than overflow.
+            return $min;
+        }
+
+        $box = @imagettfbbox($max, 0, $face, $text);
+
+        if ($box === false) {
+            return $min;
+        }
+
+        $width = abs($box[2] - $box[0]);
+
+        if ($width <= 0 || $width <= $available) {
+            return $max;
+        }
+
+        return max($min, (int) floor($max * $available / $width));
     }
 
     /** ffmpeg wants 0xRRGGBB; the palette stores #rrggbb. */
