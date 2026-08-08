@@ -226,7 +226,7 @@ body::before {
    inside blurLeadMs, before the names are asked to sit over it. */
 #intro {
   opacity: 0;
-  transition: opacity 900ms var(--ease-soft), filter 900ms var(--ease-soft);
+  transition: opacity 1.4s var(--ease-soft), filter 1.4s var(--ease-soft);
 }
 #intro.playing { opacity: 1; }
 
@@ -396,7 +396,7 @@ main {
 main > * {
   opacity: 0;
   transform: translateY(18px);
-  transition: opacity 1s var(--ease), transform 1s var(--ease);
+  transition: opacity 1.6s var(--ease), transform 1.6s var(--ease);
 }
 
 /* Phase one: the names alone, centred on the clip.
@@ -467,7 +467,7 @@ main > .couple-section { transition: opacity 1.1s var(--ease); }
 main.revealed > * {
   opacity: 1;
   transform: none;
-  transition-delay: calc(var(--i, 0) * 110ms);
+  transition-delay: calc(var(--i, 0) * 200ms);
 }
 
 @keyframes rise {
