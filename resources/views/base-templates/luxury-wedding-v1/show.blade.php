@@ -1545,9 +1545,10 @@ function cues(d) {
 
     const names = back(CONFIG.namesLeadMs);
 
-    // The names always get the clip to themselves for a beat, however tight —
-    // that pause is the whole effect.
-    const reveal = Math.max(names + 0.5, back(CONFIG.fadeOutLeadMs));
+    // Just enough for the names to register before everything else fires —
+    // the glide, the curtain dissolve, and the content stagger all start
+    // together as one swift motion.
+    const reveal = Math.max(names + 0.1, back(CONFIG.fadeOutLeadMs));
 
     return { names, reveal };
 }
