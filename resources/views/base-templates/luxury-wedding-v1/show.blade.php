@@ -91,9 +91,15 @@
     $verseRef = trim($invitation->slot('verse_ref'));
 @endphp
 <!DOCTYPE html>
-<html lang="{{ $locale }}" dir="{{ $rtl ? 'rtl' : 'ltr' }}">
+<html lang="{{ $locale }}" dir="{{ $rtl ? 'rtl' : 'ltr' }}" translate="no">
 <head>
 <meta charset="utf-8">
+
+{{-- The invitation is already in the language the guest chose a link for, so
+     Chrome offering to translate it is a banner over the reveal and nothing
+     more. Both are needed: the meta stops the offer, the attribute stops the
+     translation itself if it is triggered another way. --}}
+<meta name="google" content="notranslate">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{ $invitation->groom_ar }} &amp; {{ $invitation->bride_ar }}</title>
 
@@ -194,12 +200,16 @@ body::before {
 /* ─── BACKDROP ───────────────────────────────────────────────────
    The lowest layer in the root stacking context. Everything above it can
    blend against it, which is the whole reason it is not inside the curtain. */
+/* Transparent, so the paper behind it is what the invitation sits on.
+   This carried `background: var(--curtain)` and, being fixed and permanent,
+   covered body's paper for the whole visit — the page never actually returned
+   to light after the reveal. The clip covers the viewport while it plays, so
+   nothing needs a fill here, and the dark before the tap is the curtain's job. */
 #backdrop {
   position: fixed;
   inset: 0;
   z-index: -2;
   overflow: hidden;
-  background: var(--curtain);
 }
 
 #backdrop video {
@@ -577,29 +587,259 @@ html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.18rem; line-h
 }
 
 /* ── Names over the clip ─────────────────────────────────────────
-   While the video is still running the names read as the inverse of whatever
-   is behind them: white on a dark frame, black on a bright one, changing as
-   the footage does. `difference` against white gives exactly that, per pixel
-   and per frame, with no sampling and nothing to keep in sync.
+   One colour, all the way through.
 
-   This is why the clip sits at the bottom of the root stacking context and
-   why `main` carries no z-index — blending only reaches what is painted below
-   it in the same context.
+   These used to invert against the footage with mix-blend-mode: difference,
+   which did exactly what it promises — recomputed per frame — so on real
+   footage the names strobed black to white to black as the clip moved. The
+   effect only existed because the backdrop was an opaque dark sheet and the
+   names had to fight it.
 
-   The gold ampersand is exempt: inverting it turns it a muddy cyan. It holds
-   its own colour and simply fades in with the rest. */
-main.blending .couple {
-  color: #fff;
-  mix-blend-mode: difference;
+   The backdrop is now transparent and softened to almost nothing before the
+   names appear, so what they sit on is paper with a faint blur drifting under
+   it. Legible, unchanging, and the same colour they end on — nothing to
+   transition and nothing to flicker. */
+
+main.names-in:not(.revealed) .couple-section {
+  opacity: 1;
+  transform: none;
 }
-main.blending .couple .amp { mix-blend-mode: normal; }
 
-/* Where blending is unavailable the names just use their own colour. Worth
-   stating rather than leaving to chance: the fallback for `difference` is no
-   blending at all, which on a dark frame would be dark ink on dark video. */
-@supports not (mix-blend-mode: difference) {
-  main.blending .couple { color: var(--paper); mix-blend-mode: normal; }
+main.names-in:not(.revealed) .couple {
+  transform: translateY(var(--lift, 0px));
 }
+
+.couple-section > .hosts,
+.couple-section > .rule {
+  opacity: 0;
+  transition: opacity 1s var(--ease) 250ms;
+}
+main.revealed .couple-section > .hosts,
+main.revealed .couple-section > .rule { opacity: 1; }
+
+/* Long and soft: this one move is what the whole sequence is built around. */
+.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease); }
+main > .couple-section { transition: opacity 1.1s var(--ease); }
+
+/* Phase two: the rest, staggered. The step is set per element from one place
+   rather than a rule per position — the old nth-child(1..8) list meant a ninth
+   section silently got no delay at all, and nobody would notice until it sat
+   there motionless among eight that moved. */
+main.revealed > * {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--i, 0) * 110ms);
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The end time, quieter than the start it follows. */
+.at-time .until { color: var(--ink-soft); }
+
+/* ─── SCROLL CUE ─────────────────────────────────────────────────
+   The invitation runs well past one screen and nothing said so, which on a
+   phone means the names and the date can read as the whole of it. Fades out on
+   the first scroll — a cue that stays after being acted on is just decoration. */
+#more {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 1.1rem;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  gap: .3rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+}
+#more.on { opacity: .75; }
+
+#more svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke: var(--gold-deep);
+  stroke-width: 1.5;
+  fill: none;
+  animation: nudge 2.2s ease-in-out infinite;
+}
+
+@keyframes nudge {
+  0%, 100% { transform: translateY(0); opacity: .55; }
+  50%      { transform: translateY(5px); opacity: 1; }
+}
+
+/* ─── PETALS ─────────────────────────────────────────────────────
+   Above the invitation, below the curtain, and untouchable. They start with the
+   reveal and thin out after it: continuous fall is livelier for the first look,
+   but it never stops being motion in the corner of the eye, and someone reading
+   a programme should not be doing it in weather. */
+#petals {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 2.4s var(--ease-soft);
+}
+#petals.on { opacity: 1; }
+
+.petal {
+  position: absolute;
+  top: calc(var(--size) * -2);
+  left: var(--x);
+  width: var(--size);
+  height: var(--size);
+  animation: fall var(--dur) linear var(--delay) infinite;
+  will-change: transform;
+}
+
+/* The mask is what makes one file work in every colour: the shape comes from
+   the SVG, the colour from `background`. As an <img> it would need a copy per
+   tint, and the tints come from a palette that is different per template. */
+.petal i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--tint);
+  opacity: .5;
+  -webkit-mask: url('{{ $petal }}') center / contain no-repeat;
+  mask: url('{{ $petal }}') center / contain no-repeat;
+  animation: sway calc(var(--dur) / 3) ease-in-out var(--delay) infinite alternate;
+  will-change: transform;
+}
+
+@keyframes fall {
+  from { transform: translateY(0); }
+  to   { transform: translateY(115vh); }
+}
+
+@keyframes sway {
+  from { transform: translateX(calc(var(--drift) * -1)) rotate(calc(var(--spin) * -1)); }
+  to   { transform: translateX(var(--drift)) rotate(var(--spin)); }
+}
+
+/* ─── GLASS ──────────────────────────────────────────────────────
+   Only panes get glass, and there are two of them.
+
+   Every section used to be one, which is what made the page read as a stack of
+   boxes: a venue is two lines and a hosting line is one, and neither fills a
+   card — they just sat in the middle of an empty pane looking accidental. So
+   the content is grouped into the two panes that have something to hold, and
+   the verse, the names and the actions sit on open paper where they belong.
+
+   The fill is `paper` at 62%, and that number is load-bearing. Every colour in
+   a generated palette is contrast-checked against solid `paper`, and a moving
+   image behind text voids that guarantee — whatever frame is passing decides
+   the ratio. Keeping the pane mostly paper holds the measured contrast to
+   within a few percent of what was promised. Thinner glass looks better in a
+   screenshot and fails on a bright frame. */
+section { margin-block: 2.6rem; }
+
+.pane {
+  position: relative;
+  padding: 2.2rem 1.6rem;
+  border-radius: 1.75rem;
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 45%, transparent) inset,
+    0 22px 50px -28px color-mix(in srgb, var(--curtain) 55%, transparent);
+}
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .pane {
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    backdrop-filter: blur(20px) saturate(1.3);
+    background: color-mix(in srgb, var(--paper) 62%, transparent);
+  }
+}
+
+/* Separates the two halves of a pane without implying a new card. */
+.divide {
+  height: 1px;
+  margin: 1.9rem auto;
+  max-width: 8rem;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--gold) 45%, transparent),
+    transparent
+  );
+}
+
+main > .couple-section {
+  transition:
+    opacity 900ms ease,
+    transform 900ms ease,
+    background-color 1.2s ease,
+    border-color 1.2s ease;
+}
+
+.label {
+  font-size: .84rem;
+  letter-spacing: calc(.26em * var(--tk));
+  color: var(--ink-soft);
+  margin: 0 0 .7rem;
+  font-weight: 400;
+}
+
+/* Verse: Arabic always, translation beneath it when present.
+   Bold and set larger than anything but the names — it opens the invitation and
+   was reading as a caption. Amiri ships a 700 weight, so this is the real face
+   rather than a browser-synthesised smear. */
+.verse-ar {
+  font-family: var(--f-serif);
+  font-size: clamp(1.2rem, 4.8vw, 1.42rem);
+  font-weight: 700;
+  line-height: 2.1;
+  color: var(--gold-deep);
+  margin: 0 auto;
+  max-width: 25rem;
+}
+.verse-en {
+  font-family: var(--f-latin);
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.85;
+  color: var(--ink-soft);
+  margin: 1rem auto 0;
+  max-width: 23rem;
+}
+.verse cite {
+  display: block;
+  font-family: var(--f-ui);
+  font-style: normal;
+  font-size: .8rem;
+  letter-spacing: calc(.2em * var(--tk));
+  color: var(--ink-soft);
+  margin-top: 1rem;
+}
+
+.hosts {
+  font-family: var(--f-serif);
+  font-size: 1.1rem;
+  line-height: 2;
+  color: var(--ink-soft);
+  margin: 0 auto;
+  max-width: 23rem;
+}
+html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.18rem; line-height: 1.85; }
+
+/* Couple names — Arabic in every locale. */
+.couple {
+  margin: 0;
+  font-family: var(--f-name);
+  font-size: clamp(2.5rem, 13vw, 3.9rem);
+  /* Ruqaa throws swashes well above the baseline; leading stops clipping. */
+  line-height: 1.7;
+  color: var(--ink);
+  font-weight: 400;
+}
+
 .couple .amp {
   display: block;
   font-family: var(--f-serif);
@@ -1175,6 +1415,9 @@ if (muteBtn) {
 let opened = false, named = false, revealed = false;
 let fadeTimer = null, namesTimer = null, softTimer = null;
 
+/* Where each beat falls, once the clip's duration is known. */
+let marks = null;
+
 /* Held from the first paint. Every path out of the intro has to release it,
    which is why unlock() is called from reveal() and nowhere else. */
 function hold() { document.documentElement.classList.add('held'); }
@@ -1247,7 +1490,7 @@ function showNames() {
         content.style.setProperty('--lift', Math.round(lift) + 'px');
     }
 
-    content.classList.add('blending', 'names-in');
+    content.classList.add('names-in');
 }
 
 /* Start the dissolve before the clip runs out so it fades while still in
@@ -1391,17 +1634,43 @@ function armSequence() {
         return;
     }
 
-    const left = at => Math.max(0, (d - at / 1000 - intro.currentTime) * 1000);
+    marks = cues(d);
+
+    const wait = at => Math.max(0, (at - intro.currentTime) * 1000);
 
     clearTimeout(softTimer);
     clearTimeout(namesTimer);
     clearTimeout(fadeTimer);
 
-    // Softening leads the names by blurLeadMs, so the backdrop is already
-    // unrecognisable by the time anything is asked to be read over it.
-    softTimer = setTimeout(softenBackdrop, left(CONFIG.namesLeadMs + CONFIG.blurLeadMs));
-    namesTimer = setTimeout(showNames, left(CONFIG.namesLeadMs));
-    fadeTimer = setTimeout(reveal, left(CONFIG.fadeOutLeadMs));
+    softTimer = setTimeout(softenBackdrop, wait(marks.soften));
+    namesTimer = setTimeout(showNames, wait(marks.names));
+    fadeTimer = setTimeout(reveal, wait(marks.reveal));
+}
+
+/**
+ * When each beat happens, in seconds into the clip.
+ *
+ * The lead times are measured back from the end, which is the right way round
+ * for a clip long enough to hold them — and nonsense for one that is not. A
+ * four-second intro with a 2.6s names lead put the names 1.4s in and the reveal
+ * at 3.2s, so the clip was over before it had shown anything: it read as being
+ * cut off, because it was.
+ *
+ * So each beat also has a floor as a fraction of the clip. Whichever is later
+ * wins, which leaves long clips exactly as they were and stops a short one from
+ * being consumed by its own lead times.
+ */
+function cues(d) {
+    const back = ms => d - ms / 1000;
+
+    const soften = Math.max(d * 0.42, back(CONFIG.namesLeadMs + CONFIG.blurLeadMs));
+    const names = Math.max(d * 0.62, back(CONFIG.namesLeadMs));
+
+    // And the reveal always trails the names, however tight the clip — the
+    // whole point is that the names have it to themselves for a moment.
+    const reveal = Math.max(names + 0.6, back(CONFIG.fadeOutLeadMs));
+
+    return { soften, names, reveal };
 }
 
 if (intro) {
@@ -1409,10 +1678,13 @@ if (intro) {
     intro.addEventListener('timeupdate', () => {
         const d = intro.duration;
         if (!isFinite(d)) return;
-        const left = d - intro.currentTime;
-        if (left <= (CONFIG.namesLeadMs + CONFIG.blurLeadMs) / 1000) softenBackdrop();
-        if (left <= CONFIG.namesLeadMs / 1000) showNames();
-        if (left <= CONFIG.fadeOutLeadMs / 1000) reveal();
+        // The same marks the timers use, so a stall cannot fire a beat at a
+        // moment the schedule would not have.
+        const at = marks ?? cues(d);
+
+        if (intro.currentTime >= at.soften) softenBackdrop();
+        if (intro.currentTime >= at.names) showNames();
+        if (intro.currentTime >= at.reveal) reveal();
     });
     intro.addEventListener('ended', reveal);
     intro.addEventListener('error', reveal);
@@ -1442,10 +1714,6 @@ function reveal() {
     release();
     startPetals();
     armScrollCue();
-
-    // Once the clip is out of sight the names have nothing left to invert
-    // against, so they come off blend mode and take their own colour.
-    setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
 
     // The clip keeps running as the backdrop — it was softened before the
     // names arrived and is not touched again. Only the scrim goes.
