@@ -128,6 +128,12 @@
   --shell: 30rem;
   --fade: {{ $s['crossfadeMs'] }}ms;
 
+  /* Arrivals decelerate hard and settle — a flat `ease` is nearly linear
+     through the middle, which is what made every transition feel like it was
+     being dragged rather than released. */
+  --ease: cubic-bezier(.16, .84, .28, 1);
+  --ease-soft: cubic-bezier(.33, 0, .2, 1);
+
   /* Tracking pulls Arabic and Kurdish letters apart and breaks their
      cursive joins, so it is only switched on for Latin. */
   --tk: {{ $rtl ? 0 : 1 }};
@@ -194,25 +200,31 @@ body::before {
 }
 
 /* The intro plays sharp, then hands over. */
-#intro { opacity: 0; transition: opacity var(--fade) ease, filter var(--fade) ease; }
+#intro { opacity: 0; transition: opacity var(--fade) var(--ease-soft), filter var(--fade) var(--ease-soft); }
 #intro.playing { opacity: 1; }
 
-/* Slowed by playbackRate rather than CSS, blurred here. Scaled up so the blur
-   has material to bleed from and cannot show a soft edge at the viewport. */
+/* Already slowed at encode time, so it plays at rate 1.0 — see
+   AmbientVideoEncoder. Scaled up so the blur has material to bleed from and
+   cannot show a soft edge at the viewport.
+
+   Kept faint on purpose. Any higher and the footage decides the page's colour,
+   which wastes the palette derived from it: the point is that the gold and the
+   paper still read, with the clip only moving underneath them. */
 #ambient {
   opacity: 0;
   transform: scale(1.15);
-  filter: blur(26px) saturate(1.15);
-  transition: opacity 1.6s ease;
+  filter: blur(30px) saturate(1.1);
+  transition: opacity 2s var(--ease);
 }
-#ambient.on { opacity: .5; }
+#ambient.on { opacity: .22; }
 
-/* When there is no separate ambient encode the intro clip stays on as one,
-   blurred in place — the effect matters more than which file it came from. */
+/* When there is no separate encode the intro clip stands in, blurred in place.
+   It has to be slowed in the browser, which judders — so it runs nearer real
+   time and leans on the blur instead. */
 #intro.ambient {
-  filter: blur(26px) saturate(1.15);
+  filter: blur(30px) saturate(1.1);
   transform: scale(1.15);
-  opacity: .5;
+  opacity: .18;
 }
 
 /* ─── INTRO ────────────────────────────────────────────────────
@@ -229,12 +241,12 @@ body::before {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: background-color var(--fade) ease, opacity var(--fade) ease;
+  transition: background-color var(--fade) var(--ease-soft), opacity var(--fade) var(--ease-soft);
 }
 #curtain.opened { background-color: transparent; }
 #curtain.gone { opacity: 0; pointer-events: none; }
 
-#prompt { position: relative; z-index: 2; text-align: center; transition: opacity 500ms ease; }
+#prompt { position: relative; z-index: 2; text-align: center; transition: opacity 420ms var(--ease); }
 #prompt.gone { opacity: 0; }
 
 .ring {
@@ -285,12 +297,33 @@ main {
    and in place, so nothing ever moves between the two phases. */
 main > * {
   opacity: 0;
-  transform: translateY(16px);
-  transition: opacity 900ms ease, transform 900ms ease;
+  transform: translateY(18px);
+  transition: opacity 1s var(--ease), transform 1s var(--ease);
 }
 
-/* Phase one: the names alone, over the still-running clip. */
-main.names-in .couple-section { opacity: 1; transform: none; }
+/* Phase one: the names alone, centred on the clip.
+   Lifted to the middle of the viewport rather than left where they will end up,
+   then let go — so the reveal is the names travelling to their place as the
+   content assembles beneath them, instead of everything appearing at once.
+
+   The transform sits on this element and not on `main`. A transformed ancestor
+   becomes a stacking context, which would cut the names off from the clip they
+   blend against; on the blended element itself it is harmless.
+
+   :not(.revealed) because both classes are set once the reveal runs, and this
+   selector is the more specific of the two. */
+main.names-in:not(.revealed) .couple-section {
+  opacity: 1;
+  transform: translateY(var(--lift, 0px));
+}
+
+/* Long and soft: this is the one move the whole sequence is built around. */
+main > .couple-section {
+  transition:
+    opacity 1.1s var(--ease),
+    transform 1.5s var(--ease),
+    background-color 1.2s var(--ease-soft);
+}
 
 /* Phase two: the rest, staggered. The step is set per element from one place
    rather than a rule per position — the old nth-child(1..8) list meant a ninth
@@ -299,7 +332,7 @@ main.names-in .couple-section { opacity: 1; transform: none; }
 main.revealed > * {
   opacity: 1;
   transform: none;
-  transition-delay: calc(var(--i, 0) * 150ms);
+  transition-delay: calc(var(--i, 0) * 110ms);
 }
 
 @keyframes rise {
@@ -324,7 +357,7 @@ main.revealed > * {
   gap: .3rem;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 900ms ease;
+  transition: opacity 900ms var(--ease);
 }
 #more.on { opacity: .75; }
 
@@ -354,7 +387,7 @@ main.revealed > * {
   overflow: hidden;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 2.4s ease;
+  transition: opacity 2.4s var(--ease-soft);
 }
 #petals.on { opacity: 1; }
 
@@ -394,50 +427,52 @@ main.revealed > * {
 }
 
 /* ─── GLASS ──────────────────────────────────────────────────────
-   Each section is a pane over the drifting backdrop. The movement is meant to
-   be felt rather than watched, which is the whole reason the loop is blurred to
-   26px and slowed to a third speed: at full strength it reads as a video with
-   text on top, not as glass.
+   Only panes get glass, and there are two of them.
 
-   The fill is `paper` at 72%, and that number is load-bearing. Every colour in
+   Every section used to be one, which is what made the page read as a stack of
+   boxes: a venue is two lines and a hosting line is one, and neither fills a
+   card — they just sat in the middle of an empty pane looking accidental. So
+   the content is grouped into the two panes that have something to hold, and
+   the verse, the names and the actions sit on open paper where they belong.
+
+   The fill is `paper` at 62%, and that number is load-bearing. Every colour in
    a generated palette is contrast-checked against solid `paper`, and a moving
    image behind text voids that guarantee — whatever frame is passing decides
    the ratio. Keeping the pane mostly paper holds the measured contrast to
-   within a few percent of what was promised, and the blur behind it flattens
-   what little variation gets through. Thinner glass looks better in a
+   within a few percent of what was promised. Thinner glass looks better in a
    screenshot and fails on a bright frame. */
-section {
+section { margin-block: 2.6rem; }
+
+.pane {
   position: relative;
-  margin-block: 1.1rem;
-  padding: 2rem 1.5rem;
-  border-radius: 1.5rem;
+  padding: 2.2rem 1.6rem;
+  border-radius: 1.75rem;
   background: color-mix(in srgb, var(--paper) 72%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
   box-shadow:
     0 1px 0 color-mix(in srgb, #fff 45%, transparent) inset,
-    0 18px 40px -24px color-mix(in srgb, var(--curtain) 55%, transparent);
+    0 22px 50px -28px color-mix(in srgb, var(--curtain) 55%, transparent);
 }
 
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  section {
-    -webkit-backdrop-filter: blur(18px) saturate(1.25);
-    backdrop-filter: blur(18px) saturate(1.25);
-    /* Thinner where the blur is doing the work of hiding the backdrop. */
+  .pane {
+    -webkit-backdrop-filter: blur(20px) saturate(1.3);
+    backdrop-filter: blur(20px) saturate(1.3);
     background: color-mix(in srgb, var(--paper) 62%, transparent);
   }
 }
 
-/* Every section gets a pane, including the names — but the names only once
-   they have stopped inverting. While blending is on they must sit on open air:
-   a translucent panel is what they would blend against, and the footage behind
-   it would count for nothing. So the pane arrives with the colour settle,
-   fading in over the same beat rather than snapping on. */
-main.blending > .couple-section {
-  background: none;
-  border-color: transparent;
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+/* Separates the two halves of a pane without implying a new card. */
+.divide {
+  height: 1px;
+  margin: 1.9rem auto;
+  max-width: 8rem;
+  background: linear-gradient(
+    to right,
+    transparent,
+    color-mix(in srgb, var(--gold) 45%, transparent),
+    transparent
+  );
 }
 
 main > .couple-section {
@@ -503,7 +538,7 @@ html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.06rem; line-h
   line-height: 1.7;
   color: var(--ink);
   font-weight: 400;
-  transition: color 1.2s ease;
+  transition: color 1.4s var(--ease-soft);
 }
 
 /* ── Names over the clip ─────────────────────────────────────────
@@ -658,7 +693,7 @@ main.blending .couple .amp { mix-blend-mode: normal; }
   color: var(--gold-deep);
   background: transparent;
   cursor: pointer;
-  transition: background 250ms ease;
+  transition: background 240ms var(--ease), transform 240ms var(--ease);
 }
 .btn:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
 .btn.solid { background: var(--gold); color: var(--paper); }
@@ -682,7 +717,27 @@ main.blending .couple .amp { mix-blend-mode: normal; }
   cursor: pointer;
 }
 #mute.on { display: grid; }
-#mute svg { width: 1.1rem; height: 1.1rem; stroke-width: 1.6; }
+
+/* Both icons occupy the same cell and cross-fade.
+   They were grid siblings relying on the `hidden` attribute, which auto-placed
+   them into two rows — so any moment both were visible showed one squashed
+   above the other inside a 2.75rem circle. Stacking them removes the
+   possibility rather than trying to time it, and swapping by opacity is
+   smoother than swapping by display, which cannot transition at all. */
+#mute svg {
+  grid-area: 1 / 1;
+  width: 1.1rem;
+  height: 1.1rem;
+  stroke-width: 1.6;
+  transition: opacity 260ms var(--ease);
+}
+#mute #ic-off { opacity: 0; }
+#mute.muted #ic-on { opacity: 0; }
+#mute.muted #ic-off { opacity: 1; }
+
+/* Belt and braces: an SVG carrying `hidden` should not paint, and relying on
+   the UA rule alone is what let this through in the first place. */
+[hidden] { display: none !important; }
 
 /* ─── Language switcher ──────────────────────────────────────────
    Only rendered when the invitation is issued in more than one
@@ -812,7 +867,7 @@ footer {
 
     <button id="mute" type="button" aria-label="{{ __('invitation.mute') }}">
         <svg id="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
-        <svg id="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" hidden><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
+        <svg id="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="m22 9-6 6M16 9l6 6"/></svg>
     </button>
 @endif
 
@@ -849,15 +904,14 @@ footer {
         </section>
     @endif
 
-    @if ($hosts = $invitation->text('hosts'))
-        <section>
-            <p class="hosts">{{ $hosts }}</p>
-        </section>
-    @endif
-
-    {{-- Released first, while the clip is still running, and never moved: the
-         two phases differ in what is visible, not in where anything sits. --}}
+    {{-- Released first, while the clip is still running, and lifted to the
+         middle of it. The line that introduces the couple travels with them —
+         it is part of the same sentence, not a separate announcement. --}}
     <section class="couple-section">
+        @if ($hosts = $invitation->text('hosts'))
+            <p class="hosts">{{ $hosts }}</p>
+        @endif
+
         <h1 class="couple" lang="ar" dir="rtl">
             <span class="name">{{ $invitation->groom_ar }}@if ($invitation->showsLatinNames())<em class="latin">{{ $invitation->groom_latin }}</em>@endif</span>
             <span class="amp">&amp;</span>
@@ -866,7 +920,10 @@ footer {
         <div class="rule"><i></i></div>
     </section>
 
-    <section>
+    {{-- When, as one pane. The date, the reading of it, the time and the count
+         down to it are one fact told four ways — split across two panes they
+         read as two unrelated boxes, and each was too thin to be a card. --}}
+    <section class="pane">
         <p class="label">{{ __('invitation.date') }}</p>
         <p class="when">{{ $invitation->formattedDate() }}</p>
         @if ($hijri = $invitation->hijriDate())
@@ -878,9 +935,7 @@ footer {
                 <span class="until">&ndash; {{ $endTime }}</span>
             @endif
         </p>
-    </section>
 
-    <section>
         <div class="countdown" id="countdown">
             <div class="unit"><b data-u="d">00</b><small>{{ __('invitation.days') }}</small></div>
             <div class="unit"><b data-u="h">00</b><small>{{ __('invitation.hours') }}</small></div>
@@ -895,26 +950,32 @@ footer {
         $venueCity = $invitation->text('venue_city');
     @endphp
 
-    @if ($venueName || $venueCity)
-        <section>
-            <p class="label">{{ __('invitation.venue') }}</p>
-            <p class="venue">
-                {{ $venueName }}@if ($venueName && $venueCity)<br>@endif{{ $venueCity }}
-            </p>
-        </section>
-    @endif
+    {{-- Where and what happens there, likewise one pane: a venue is two lines
+         and a programme is the evening that runs in it. --}}
+    @if ($venueName || $venueCity || $programme)
+        <section class="pane">
+            @if ($venueName || $venueCity)
+                <p class="label">{{ __('invitation.venue') }}</p>
+                <p class="venue">
+                    {{ $venueName }}@if ($venueName && $venueCity)<br>@endif{{ $venueCity }}
+                </p>
+            @endif
 
-    @if ($programme)
-        <section>
-            <p class="label">{{ __('invitation.programme') }}</p>
-            <ul class="programme">
-                @foreach ($programme as $row)
-                    <li>
-                        <time>{{ $row['time'] ?? '' }}</time>
-                        <span>{{ $row['title'] }}</span>
-                    </li>
-                @endforeach
-            </ul>
+            @if ($programme)
+                @if ($venueName || $venueCity)
+                    <div class="divide"></div>
+                @endif
+
+                <p class="label">{{ __('invitation.programme') }}</p>
+                <ul class="programme">
+                    @foreach ($programme as $row)
+                        <li>
+                            <time>{{ $row['time'] ?? '' }}</time>
+                            <span>{{ $row['title'] }}</span>
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
         </section>
     @endif
 
@@ -1062,8 +1123,7 @@ if (muteBtn) {
         if (muteNode) muteNode.gain.value = muted ? 0 : 1;
         else music.muted = muted;
 
-        document.getElementById('ic-on').hidden  = muted;
-        document.getElementById('ic-off').hidden = !muted;
+        muteBtn.classList.toggle('muted', muted);
         muteBtn.setAttribute('aria-label', muted ? LABELS.unmute : LABELS.mute);
     });
 }
@@ -1132,6 +1192,21 @@ function showNames() {
     if (named) return;
     named = true;
 
+    // How far to lift the names so they sit in the middle of the clip.
+    //
+    // Measured now, before the class lands, because this reads the element
+    // where it will finally sit — the page is unscrolled and nothing is
+    // transformed yet, so its own box is the honest answer. Measuring after
+    // would be measuring the lift that was just applied.
+    const names = content.querySelector('.couple-section');
+
+    if (names) {
+        const box = names.getBoundingClientRect();
+        const lift = (window.innerHeight / 2) - (box.top + box.height / 2);
+
+        content.style.setProperty('--lift', Math.round(lift) + 'px');
+    }
+
     content.classList.add('blending', 'names-in');
 }
 
@@ -1197,7 +1272,10 @@ function startAmbient() {
     const layer = ambient ?? intro;
     if (!layer) return;
 
-    layer.playbackRate = CONFIG.ambientRate;
+    // The encoded loop is already slow, so it plays at its own speed — asking
+    // the browser to slow it further is what made it stutter. Only the
+    // stand-in has to be slowed here, and gently.
+    layer.playbackRate = layer === ambient ? 1 : CONFIG.ambientRate;
     layer.loop = true;
     layer.muted = true;
 

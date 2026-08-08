@@ -40,6 +40,28 @@ class AmbientVideoEncoder
     private const MAX_SECONDS = 20.0;
 
     /**
+     * How much to stretch the footage out.
+     *
+     * Slowing it here rather than with `playbackRate` in the browser, which is
+     * the whole reason this stretch exists. At a rate of 0.35 the browser has
+     * to present each decoded frame across three refreshes, and it does not
+     * space them evenly — the result visibly stutters no matter how gentle the
+     * footage is. Stretched at encode time the loop plays at rate 1.0, one new
+     * frame per refresh, and the judder has nowhere to come from.
+     */
+    private const SLOWDOWN = 2.8;
+
+    /**
+     * Output frame rate.
+     *
+     * Set explicitly because `setpts` alone stretches timestamps without adding
+     * frames, leaving a clip that is long but still only has the original
+     * frames in it — smooth playback needs them interpolated up to a steady
+     * cadence, which is what `fps` does here.
+     */
+    private const FPS = 30;
+
+    /**
      * Encode a backdrop loop for a stored intro clip.
      *
      * @param  string  $url  public URL of the source, as stored on the template
@@ -69,9 +91,17 @@ class AmbientVideoEncoder
             '-y',
             '-i', $source,
 
-            // reverse needs the whole stream in memory; scale first so what it
-            // holds is 480px frames rather than full-size ones.
-            '-vf', 'scale='.self::WIDTH.':-2,reverse',
+            // Order matters. Scale first so `reverse` — which holds every frame
+            // it will emit in memory — buffers 480px frames rather than
+            // full-size ones. Then stretch the timestamps, then resample to a
+            // steady frame rate so the extra duration is filled with frames
+            // instead of held ones.
+            '-vf', implode(',', [
+                'scale='.self::WIDTH.':-2',
+                'reverse',
+                'setpts='.self::SLOWDOWN.'*PTS',
+                'fps='.self::FPS,
+            ]),
 
             // No audio at all: this layer is silent, and the music owns sound.
             '-an',
