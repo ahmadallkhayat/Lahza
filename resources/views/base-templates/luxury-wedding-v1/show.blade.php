@@ -210,6 +210,7 @@ body::before {
   inset: 0;
   z-index: -2;
   overflow: hidden;
+  background: var(--curtain);
 }
 
 #backdrop video {
@@ -432,6 +433,10 @@ main.names-in:not(.revealed) .couple-section {
   transform: none;
 }
 
+main.names-in:not(.revealed) .couple {
+  transform: translateY(var(--lift, 0px));
+}
+
 /* No lift. The names appear at their final position and never move again.
    Centring them on the clip and then travelling them home meant that at the
    moment the rest of the page arrived, the names slid down to meet it — the
@@ -447,8 +452,23 @@ main.revealed .couple-section > .hosts,
 main.revealed .couple-section > .rule { opacity: 1; }
 
 /* Long and soft: this one move is what the whole sequence is built around. */
-.couple { transition: color 1.4s var(--ease-soft); }
+.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease); }
 main > .couple-section { transition: opacity 1.1s var(--ease); }
+
+/* The names inverted against the footage, so they stay legible whatever
+   passes behind them.
+
+   The gold ampersand is exempt: inverting it turns it a muddy cyan. It holds
+   its own colour and simply fades in with the rest. */
+main.blending .couple {
+  color: #fff;
+  mix-blend-mode: difference;
+}
+main.blending .couple .amp { mix-blend-mode: normal; }
+
+@supports not (mix-blend-mode: difference) {
+  main.blending .couple { color: var(--paper); mix-blend-mode: normal; }
+}
 
 /* Phase two: the rest, staggered. The step is set per element from one place
    rather than a rule per position — the old nth-child(1..8) list meant a ninth
@@ -1359,8 +1379,18 @@ function showNames() {
     if (named) return;
     named = true;
 
+    // How far to lift the names so they sit in the middle of the clip.
+    //
+    // Measured now, before the class lands, because this reads the element
+    // bounds as they are and lifting it would change them.
+    if (intro && content) {
+        const box = content.querySelector('.couple-section').getBoundingClientRect();
+        const lift = (window.innerHeight / 2) - (box.top + box.height / 2);
 
-    content.classList.add('names-in');
+        content.style.setProperty('--lift', Math.round(lift) + 'px');
+    }
+
+    content.classList.add('blending', 'names-in');
 }
 
 /* Start the dissolve before the clip runs out so it fades while still in
@@ -1592,6 +1622,7 @@ function reveal() {
     Array.from(content.children).forEach((el, i) => el.style.setProperty('--i', i));
 
     content.classList.add('revealed');
+    setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
     if (muteBtn) muteBtn.classList.add('on');
     if (langs) langs.classList.add('on');
     settleMusic();
