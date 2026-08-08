@@ -226,7 +226,7 @@ body::before {
    inside blurLeadMs, before the names are asked to sit over it. */
 #intro {
   opacity: 0;
-  transition: opacity 1.4s var(--ease-soft), filter 1.4s var(--ease-soft);
+  transition: opacity 1.8s var(--ease-soft), filter 1.8s var(--ease-soft);
 }
 #intro.playing { opacity: 1; }
 
@@ -396,7 +396,7 @@ main {
 main > * {
   opacity: 0;
   transform: translateY(18px);
-  transition: opacity 1.6s var(--ease), transform 1.6s var(--ease);
+  transition: opacity 2s var(--ease), transform 2s var(--ease);
 }
 
 /* Phase one: the names alone, centred on the clip.
@@ -454,11 +454,11 @@ main.revealed .couple-section > .rule { opacity: 1; }
 /* The one move: names glide from the centre of the clip to their home, color
    fades from white to the page ink, shadow dissolves. Long and soft. */
 .couple {
-  transition: color 1.4s var(--ease-soft),
-              transform 1.6s var(--ease),
-              text-shadow 1.4s var(--ease-soft);
+  transition: color 1.8s var(--ease-soft),
+              transform 2s var(--ease),
+              text-shadow 1.8s var(--ease-soft);
 }
-main > .couple-section { transition: opacity 1.1s var(--ease); }
+main > .couple-section { transition: opacity 1.3s var(--ease); }
 
 /* Phase two: the rest, staggered. The step is set per element from one place
    rather than a rule per position — the old nth-child(1..8) list meant a ninth
@@ -467,7 +467,7 @@ main > .couple-section { transition: opacity 1.1s var(--ease); }
 main.revealed > * {
   opacity: 1;
   transform: none;
-  transition-delay: calc(var(--i, 0) * 200ms);
+  transition-delay: calc(var(--i, 0) * 220ms);
 }
 
 @keyframes rise {
@@ -1045,6 +1045,7 @@ footer {
     <section class="couple-section">
         @if ($hosts = $invitation->text('hosts'))
             <p class="hosts">{{ $hosts }}</p>
+            <div class="rule"><i></i></div>
         @endif
 
         <h1 class="couple" lang="ar" dir="rtl">
