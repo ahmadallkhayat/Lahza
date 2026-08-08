@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\InvitationRequest;
 use App\Models\Asset;
 use App\Models\Invitation;
 use App\Models\Template;
+use App\Services\OgImageGenerator;
 use App\Support\BaseTemplates;
 use App\Support\ContentSlots;
 use Illuminate\Database\Eloquent\Collection;
@@ -45,6 +46,8 @@ class InvitationController extends Controller
 
         $invitation = Invitation::create($data);
 
+        $invitation->update(['og_image' => app(OgImageGenerator::class)->generate($invitation)]);
+
         return to_route('admin.invitations.edit', $invitation)
             ->with('status', 'Invitation created.');
     }
@@ -66,11 +69,23 @@ class InvitationController extends Controller
 
         $invitation->update($data);
 
+        // Redrawn only when something the card shows has changed. It is an
+        // ffmpeg call, not worth spending to correct a phone number.
+        if ($invitation->wasChanged(['groom_ar', 'bride_ar', 'starts_at', 'template_id', 'slug'])) {
+            $card = app(OgImageGenerator::class);
+            $previous = $invitation->getOriginal('og_image');
+
+            $invitation->update(['og_image' => $card->generate($invitation)]);
+            $card->forget($previous);
+        }
+
         return back()->with('status', 'Invitation updated.');
     }
 
     public function destroy(Invitation $invitation): RedirectResponse
     {
+        app(OgImageGenerator::class)->forget($invitation->og_image);
+
         $invitation->delete();
 
         return to_route('admin.invitations.index')->with('status', 'Invitation deleted.');

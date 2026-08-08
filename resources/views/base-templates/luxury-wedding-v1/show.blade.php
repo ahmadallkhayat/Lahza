@@ -102,7 +102,18 @@
 <meta property="og:title" content="{{ $invitation->groom_ar }} & {{ $invitation->bride_ar }}">
 <meta property="og:description" content="{{ $invitation->formattedDate() }}{{ $invitation->text('venue_name') ? ' — '.$invitation->text('venue_name') : '' }}">
 <meta property="og:url" content="{{ $localeUrl($locale) }}">
-<meta name="twitter:card" content="summary_large_image">
+@if ($invitation->og_image)
+    {{-- Absolute: a scraper does not resolve relative URLs. --}}
+    <meta property="og:image" content="{{ url($invitation->og_image) }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="{{ $invitation->groom_ar }} & {{ $invitation->bride_ar }}">
+    <meta name="twitter:card" content="summary_large_image">
+@else
+    {{-- No card, so no promise of one: summary_large_image without an image
+         makes a scraper reserve space it cannot fill. --}}
+    <meta name="twitter:card" content="summary">
+@endif
 
 <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
 

@@ -45,6 +45,7 @@ class Invitation extends Model
         'content',
         'show_verse',
         'published',
+        'og_image',
     ];
 
     protected $casts = [
