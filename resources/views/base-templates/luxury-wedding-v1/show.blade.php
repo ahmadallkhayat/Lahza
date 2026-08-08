@@ -1589,11 +1589,11 @@ function reveal() {
     // :not(.revealed) rule that sets color:#fff never visually applies, so the
     // transition has no "from" value and the colour snaps instead of fading.
     requestAnimationFrame(() => {
+        // All three fire on the same frame: video blurs, curtain dissolves,
+        // content appears. Nothing else is ever visible over a sharp video.
+        if (intro) intro.classList.add('ambient');
         curtain.classList.add('gone');
 
-        // The stagger step comes from the element's own position, counted here
-        // rather than written into the stylesheet — sections are conditional, so
-        // a verse-less invitation would otherwise leave a hole in the sequence.
         Array.from(content.children).forEach((el, i) => el.style.setProperty('--i', i));
 
         content.classList.add('revealed');
@@ -1604,8 +1604,6 @@ function reveal() {
         startPetals();
         armScrollCue();
 
-        // Once the crossfade has fully dissolved the clip, pause it and hand
-        // off to the ambient layer.
         setTimeout(() => {
             if (intro) intro.pause();
             curtain.remove();
