@@ -22,10 +22,9 @@ class Template extends Model
         // the video to themselves before it starts dissolving.
         'namesLeadMs' => 2600,
 
-        // Only used for the stand-in backdrop, when no reversed encode exists.
-        // The encoded loop is slowed by ffmpeg and plays at 1.0, because
-        // slowing playback in the browser stutters. Kept mild for that reason.
-        'ambientRate' => 0.7,
+        // How far ahead of the names the backdrop starts blurring, so it is
+        // already soft before anything is asked to be read over it.
+        'blurLeadMs' => 1000,
 
         // How long petals keep falling after the reveal before thinning out.
         'petalsMs' => 22000,

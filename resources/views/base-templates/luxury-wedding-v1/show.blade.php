@@ -211,7 +211,12 @@ body::before {
 }
 
 /* The intro plays sharp, then hands over. */
-#intro { opacity: 0; transition: opacity var(--fade) var(--ease-soft), filter var(--fade) var(--ease-soft); }
+/* The softening is quicker than the crossfade on purpose: it has to finish
+   inside blurLeadMs, before the names are asked to sit over it. */
+#intro {
+  opacity: 0;
+  transition: opacity 900ms var(--ease-soft), filter 900ms var(--ease-soft);
+}
 #intro.playing { opacity: 1; }
 
 /* Already slowed at encode time, so it plays at rate 1.0 — see
@@ -237,6 +242,10 @@ body::before {
   transform: scale(1.15);
   opacity: .18;
 }
+
+/* Handed over to the reversed encode. Both are blurred identically by now, so
+   crossing between them is invisible. */
+#intro.handed { opacity: 0; }
 
 /* ─── INTRO ────────────────────────────────────────────────────
    The curtain is now only a scrim and a prompt — the clip moved to #backdrop.
@@ -1164,7 +1173,7 @@ if (muteBtn) {
    Nothing moves between beats. The names are released in their final position
    and stay there — what changes is what else is visible around them. */
 let opened = false, named = false, revealed = false;
-let fadeTimer = null, namesTimer = null;
+let fadeTimer = null, namesTimer = null, softTimer = null;
 
 /* Held from the first paint. Every path out of the intro has to release it,
    which is why unlock() is called from reveal() and nowhere else. */
@@ -1217,6 +1226,11 @@ curtain.addEventListener('click', () => {
 function showNames() {
     if (named) return;
     named = true;
+
+    // Belt and braces: a stalled or very short clip can reach this without the
+    // scheduled soften having fired, and sharp footage under the names is the
+    // one thing this sequence must not do.
+    softenBackdrop();
 
     // How far to lift the names so they sit in the middle of the clip.
     //
@@ -1282,43 +1296,78 @@ function startPetals() {
     }, CONFIG.petalsMs);
 }
 
-/* ── the ambient backdrop ───────────────────────────────────────────
-   The clip again, reversed and slowed to almost nothing, blurred past
-   recognition. It is not there to be watched — it is there so the glass panels
-   have something moving to refract, which is what stops them looking like flat
-   translucent rectangles.
+/* ── the backdrop softens ───────────────────────────────────────────
+   The clip does not stop being the backdrop when the invitation arrives — it
+   becomes it, blurred past recognition and dimmed, so the glass panels have
+   something moving to refract.
 
-   Reversed because forward playback loops with a visible jump back to the first
-   frame; reversed footage of a slow motion reads as continuous drift. */
-function startAmbient() {
-    // Motion is the entire point of this layer, so honouring the preference
-    // means not running it at all rather than running it faster.
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+   This runs *before* the names, not after the reveal. Blurring afterwards meant
+   the content appeared over footage that was still sharp and only softened once
+   everything was already on screen.
 
-    const layer = ambient ?? intro;
-    if (!layer) return;
+   Nothing is ever paused and restarted here. The old handover paused the intro
+   at the end of the clip and then called play() with loop on, which sent it
+   back to frame zero — visibly, at full opacity, while the blur was still
+   ramping in. That restart is the flash. */
+let softened = false;
 
-    // The encoded loop is already slow, so it plays at its own speed — asking
-    // the browser to slow it further is what made it stutter. Only the
-    // stand-in has to be slowed here, and gently.
-    layer.playbackRate = layer === ambient ? 1 : CONFIG.ambientRate;
-    layer.loop = true;
-    layer.muted = true;
+function softenBackdrop() {
+    if (softened) return;
+    softened = true;
 
-    // Without a reversed encode the intro clip stands in, blurred in place.
-    layer.classList.add(layer === intro ? 'ambient' : 'on');
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    layer.play().catch(() => {
-        // Refused, which costs nothing but the effect. Take the blur off so it
-        // does not sit there as a frozen smear.
-        layer.classList.remove('ambient', 'on');
+    if (intro) {
+        // Set before the clip can reach its end, so it wraps rather than
+        // stopping — a loop that is already running has no first frame to
+        // jump back to that anyone can see through a 30px blur.
+        //
+        // Left at its own speed. Slowing playback in the browser is what made
+        // the backdrop stutter, and behind a 30px blur at this opacity the
+        // difference between real time and a third of it barely registers.
+        intro.loop = true;
+        intro.classList.add('ambient');
+
+        // Motion is what the preference is about; the blur is not. Hold a soft
+        // frozen frame rather than removing the layer.
+        if (still) {
+            intro.pause();
+
+            return;
+        }
+    }
+
+    if (still || !ambient) return;
+
+    /* The reversed encode takes over. Both layers are blurred to the same
+       degree by now, so the crossfade has nothing recognisable in it — which is
+       the only reason the swap can happen mid-view at all. */
+    ambient.muted = true;
+    ambient.loop = true;
+    ambient.playbackRate = 1;
+
+    ambient.play().then(() => {
+        ambient.classList.add('on');
+        if (intro) intro.classList.add('handed');
+
+        watchVisibility(ambient);
+    }).catch(() => {
+        // Refused. The blurred intro is already standing in, so there is
+        // nothing to undo.
     });
 
-    // A video decoding behind a hidden tab is pure battery for no one's
-    // benefit, and phones background these aggressively anyway.
+    watchVisibility(intro);
+}
+
+/* A video decoding behind a hidden tab is battery spent for no one. */
+function watchVisibility(layer) {
+    if (!layer) return;
+
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) layer.pause();
-        else layer.play().catch(() => {});
+        else if (layer.classList.contains('ambient') || layer.classList.contains('on')) {
+            layer.play().catch(() => {});
+        }
     });
 }
 
@@ -1336,6 +1385,7 @@ function armSequence() {
     if (!isFinite(d) || d <= 0) {
         // Duration unknown, so lead times mean nothing. Show the names now
         // rather than leave the clip playing over an empty page.
+        softenBackdrop();
         showNames();
 
         return;
@@ -1343,8 +1393,13 @@ function armSequence() {
 
     const left = at => Math.max(0, (d - at / 1000 - intro.currentTime) * 1000);
 
+    clearTimeout(softTimer);
     clearTimeout(namesTimer);
     clearTimeout(fadeTimer);
+
+    // Softening leads the names by blurLeadMs, so the backdrop is already
+    // unrecognisable by the time anything is asked to be read over it.
+    softTimer = setTimeout(softenBackdrop, left(CONFIG.namesLeadMs + CONFIG.blurLeadMs));
     namesTimer = setTimeout(showNames, left(CONFIG.namesLeadMs));
     fadeTimer = setTimeout(reveal, left(CONFIG.fadeOutLeadMs));
 }
@@ -1355,6 +1410,7 @@ if (intro) {
         const d = intro.duration;
         if (!isFinite(d)) return;
         const left = d - intro.currentTime;
+        if (left <= (CONFIG.namesLeadMs + CONFIG.blurLeadMs) / 1000) softenBackdrop();
         if (left <= CONFIG.namesLeadMs / 1000) showNames();
         if (left <= CONFIG.fadeOutLeadMs / 1000) reveal();
     });
@@ -1391,13 +1447,9 @@ function reveal() {
     // against, so they come off blend mode and take their own colour.
     setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
 
-    // Let the clip run through the whole dissolve — pausing here is what
-    // made it look like it stopped and then faded.
-    setTimeout(() => {
-        if (intro) intro.pause();
-        curtain.remove();
-        startAmbient();
-    }, CONFIG.crossfadeMs + 200);
+    // The clip keeps running as the backdrop — it was softened before the
+    // names arrived and is not touched again. Only the scrim goes.
+    setTimeout(() => curtain.remove(), CONFIG.crossfadeMs + 200);
 }
 
 /* ── language switching ─────────────────────────────────────────
