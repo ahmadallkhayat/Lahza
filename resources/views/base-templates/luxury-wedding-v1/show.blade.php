@@ -1446,7 +1446,14 @@ function handOver() {
 
         ambient.play().then(() => {
             ambient.classList.add('on');
-            intro.classList.add('done');
+
+            // `handed`, which is what the stylesheet calls it. This said `done`
+            // and nothing styled that, so the sharp intro never faded: it sat at
+            // full opacity over the blurred loop, played once, and froze on its
+            // last frame behind the invitation. The clip looked stuck and the
+            // backdrop looked unblurred, because both were true.
+            intro.classList.add('handed');
+
             watchVisibility(ambient);
         }).catch(() => {
             // No encode playable, so the intro stays on as the backdrop.
