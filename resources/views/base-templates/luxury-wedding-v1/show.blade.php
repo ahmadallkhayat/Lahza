@@ -276,7 +276,7 @@ body::before {
 #prompt p {
   margin: 0;
   color: color-mix(in srgb, var(--gold) 55%, white);
-  font-size: .8rem;
+  font-size: .9rem;
   letter-spacing: calc(.34em * var(--tk));
   font-weight: 300;
 }
@@ -312,18 +312,30 @@ main > * {
 
    :not(.revealed) because both classes are set once the reveal runs, and this
    selector is the more specific of the two. */
+/* The section is present so the heading inside it can be, but only the heading
+   travels. The line above the names and the rule below them belong to the laid
+   out page and arrive with it — lifting the whole block moved all three onto
+   the clip, which is not what was asked for. */
 main.names-in:not(.revealed) .couple-section {
   opacity: 1;
+  transform: none;
+}
+
+main.names-in:not(.revealed) .couple {
   transform: translateY(var(--lift, 0px));
 }
 
-/* Long and soft: this is the one move the whole sequence is built around. */
-main > .couple-section {
-  transition:
-    opacity 1.1s var(--ease),
-    transform 1.5s var(--ease),
-    background-color 1.2s var(--ease-soft);
+.couple-section > .hosts,
+.couple-section > .rule {
+  opacity: 0;
+  transition: opacity 1s var(--ease) 250ms;
 }
+main.revealed .couple-section > .hosts,
+main.revealed .couple-section > .rule { opacity: 1; }
+
+/* Long and soft: this one move is what the whole sequence is built around. */
+.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease); }
+main > .couple-section { transition: opacity 1.1s var(--ease); }
 
 /* Phase two: the rest, staggered. The step is set per element from one place
    rather than a rule per position — the old nth-child(1..8) list meant a ninth
@@ -484,18 +496,22 @@ main > .couple-section {
 }
 
 .label {
-  font-size: .68rem;
-  letter-spacing: calc(.3em * var(--tk));
+  font-size: .84rem;
+  letter-spacing: calc(.26em * var(--tk));
   color: var(--ink-soft);
-  margin: 0 0 .55rem;
+  margin: 0 0 .7rem;
   font-weight: 400;
 }
 
-/* Verse: Arabic always, translation small beneath it when present. */
+/* Verse: Arabic always, translation beneath it when present.
+   Bold and set larger than anything but the names — it opens the invitation and
+   was reading as a caption. Amiri ships a 700 weight, so this is the real face
+   rather than a browser-synthesised smear. */
 .verse-ar {
   font-family: var(--f-serif);
-  font-size: 1.04rem;
-  line-height: 2.15;
+  font-size: clamp(1.2rem, 4.8vw, 1.42rem);
+  font-weight: 700;
+  line-height: 2.1;
   color: var(--gold-deep);
   margin: 0 auto;
   max-width: 25rem;
@@ -503,31 +519,31 @@ main > .couple-section {
 .verse-en {
   font-family: var(--f-latin);
   font-style: italic;
-  font-size: .84rem;
-  line-height: 1.8;
+  font-size: 1rem;
+  line-height: 1.85;
   color: var(--ink-soft);
-  margin: .9rem auto 0;
+  margin: 1rem auto 0;
   max-width: 23rem;
 }
 .verse cite {
   display: block;
   font-family: var(--f-ui);
   font-style: normal;
-  font-size: .66rem;
-  letter-spacing: calc(.22em * var(--tk));
+  font-size: .8rem;
+  letter-spacing: calc(.2em * var(--tk));
   color: var(--ink-soft);
-  margin-top: .85rem;
+  margin-top: 1rem;
 }
 
 .hosts {
   font-family: var(--f-serif);
-  font-size: .98rem;
+  font-size: 1.1rem;
   line-height: 2;
   color: var(--ink-soft);
   margin: 0 auto;
   max-width: 23rem;
 }
-html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.06rem; line-height: 1.85; }
+html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.18rem; line-height: 1.85; }
 
 /* Couple names — Arabic in every locale. */
 .couple {
@@ -538,7 +554,6 @@ html[lang="en"] .hosts { font-family: var(--f-latin); font-size: 1.06rem; line-h
   line-height: 1.7;
   color: var(--ink);
   font-weight: 400;
-  transition: color 1.4s var(--ease-soft);
 }
 
 /* ── Names over the clip ─────────────────────────────────────────
@@ -598,10 +613,10 @@ main.blending .couple .amp { mix-blend-mode: normal; }
 .rule::after  { background: linear-gradient(to right, var(--gold), transparent); }
 .rule i { width: .42rem; height: .42rem; background: var(--gold); transform: rotate(45deg); flex: none; }
 
-.when  { font-size: 1.45rem; margin: 0; font-weight: 400; }
-.hijri { font-size: .78rem; color: var(--ink-soft); margin: .4rem 0 0; }
-.at-time { font-family: var(--f-serif); font-size: 1.7rem; color: var(--gold-deep); margin: .9rem 0 0; }
-.venue { font-size: 1.1rem; margin: 0; line-height: 1.75; }
+.when  { font-size: 1.62rem; margin: 0; font-weight: 400; }
+.hijri { font-size: .92rem; color: var(--ink-soft); margin: .4rem 0 0; }
+.at-time { font-family: var(--f-serif); font-size: 1.9rem; color: var(--gold-deep); margin: .9rem 0 0; }
+.venue { font-size: 1.22rem; margin: 0; line-height: 1.75; }
 
 .countdown { display: flex; justify-content: center; gap: clamp(.5rem, 3.5vw, 1.3rem); }
 .unit {
@@ -615,7 +630,7 @@ main.blending .couple .amp { mix-blend-mode: normal; }
 .unit b {
   display: block;
   font-family: var(--f-serif);
-  font-size: 1.75rem;
+  font-size: 1.95rem;
   font-weight: 400;
   color: var(--gold-deep);
   font-variant-numeric: tabular-nums;
@@ -623,12 +638,12 @@ main.blending .couple .amp { mix-blend-mode: normal; }
 }
 .unit small {
   display: block;
-  font-size: .62rem;
+  font-size: .76rem;
   letter-spacing: calc(.16em * var(--tk));
   color: var(--ink-soft);
   margin-top: .3rem;
 }
-.begun { font-family: var(--f-serif); font-size: 1.3rem; color: var(--gold-deep); margin: 0; }
+.begun { font-family: var(--f-serif); font-size: 1.45rem; color: var(--gold-deep); margin: 0; }
 
 /* An evening runs in order, so it is drawn as one: a spine down the times with
    a mark at each moment. Rules between rows made it a table of two columns that
@@ -676,7 +691,7 @@ main.blending .couple .amp { mix-blend-mode: normal; }
   color: var(--gold-deep);
   font-variant-numeric: tabular-nums;
 }
-.programme span { font-size: .98rem; }
+.programme span { font-size: 1.06rem; }
 
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .7rem; }
 .btn {
@@ -686,7 +701,7 @@ main.blending .couple .amp { mix-blend-mode: normal; }
   padding: .8rem 1.5rem;
   border-radius: 2rem;
   font-family: var(--f-ui);
-  font-size: .78rem;
+  font-size: .92rem;
   letter-spacing: calc(.13em * var(--tk));
   text-decoration: none;
   border: 1px solid var(--gold);
@@ -762,7 +777,7 @@ main.blending .couple .amp { mix-blend-mode: normal; }
   backdrop-filter: blur(8px);
   color: var(--gold-deep);
   font-family: var(--f-ui);
-  font-size: .68rem;
+  font-size: .8rem;
   text-align: center;
   text-decoration: none;
   line-height: 1.3;
@@ -771,8 +786,8 @@ main.blending .couple .amp { mix-blend-mode: normal; }
 
 footer {
   margin-top: 3.5rem;
-  font-size: .7rem;
-  letter-spacing: calc(.34em * var(--tk));
+  font-size: .82rem;
+  letter-spacing: calc(.3em * var(--tk));
   color: var(--ink-soft);
   opacity: .75;
 }
@@ -893,7 +908,7 @@ footer {
 <main id="content">
 
     @if ($invitation->show_verse && $verse !== '')
-        <section class="verse">
+        <section class="verse pane">
             <p class="verse-ar" lang="ar" dir="rtl">{{ $verse }}</p>
             @if ($verseTranslation !== '')
                 <p class="verse-en">{{ $verseTranslation }}</p>
@@ -1198,7 +1213,7 @@ function showNames() {
     // where it will finally sit — the page is unscrolled and nothing is
     // transformed yet, so its own box is the honest answer. Measuring after
     // would be measuring the lift that was just applied.
-    const names = content.querySelector('.couple-section');
+    const names = content.querySelector('.couple');
 
     if (names) {
         const box = names.getBoundingClientRect();
