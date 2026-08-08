@@ -677,7 +677,7 @@ html[lang="en"] .hosts { font-family: var(--f-latin); font-size: clamp(1.35rem, 
 
 /* Couple names — Arabic in every locale. */
 .couple {
-  margin: 0;
+  margin: 32px 0 0;
   font-family: var(--f-name);
   font-size: clamp(2.5rem, 13vw, 3.9rem);
   /* Ruqaa throws swashes well above the baseline; leading stops clipping. */
