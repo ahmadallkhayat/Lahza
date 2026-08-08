@@ -1580,6 +1580,11 @@ function reveal() {
 
     curtain.classList.add('gone');
 
+    // The clip must not stop while the crossfade is still running — if it
+    // reaches its last frame it freezes visibly for the remainder. Looping
+    // it makes the wrap invisible under the dissolve.
+    if (intro) intro.loop = true;
+
     // The stagger step comes from the element's own position, counted here
     // rather than written into the stylesheet — sections are conditional, so a
     // verse-less invitation would otherwise leave a hole in the sequence.
@@ -1593,8 +1598,8 @@ function reveal() {
     startPetals();
     armScrollCue();
 
-    // Let the clip run through the whole dissolve — pausing here is what
-    // made it look like it stopped and then faded.
+    // Once the crossfade has fully dissolved the clip, pause it and hand
+    // off to the ambient layer.
     setTimeout(() => {
         if (intro) intro.pause();
         curtain.remove();
