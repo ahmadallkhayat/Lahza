@@ -7,13 +7,16 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
- * Makes the backdrop loop: the intro clip, reversed and re-encoded small.
+ * Makes the backdrop loop: the intro clip as a slow palindrome.
  *
- * Reversed because forward playback loops with a visible jump from the last
- * frame back to the first. Run backwards, slow footage reads as continuous
- * drift and the seam disappears — and reversing has to happen here because no
- * browser can do it. `playbackRate` refuses negative values, and stepping
- * `currentTime` backwards frame by frame stutters badly on a phone.
+ * Forward, then the same footage backward, joined into one file. Looped, it
+ * plays out to the end and comes back the way it came, so there is never a cut
+ * from the last frame to the first — which is the jump that made plain looping
+ * unusable as a backdrop.
+ *
+ * It has to happen here because no browser can play a video backwards.
+ * `playbackRate` refuses negative values, and stepping `currentTime` down frame
+ * by frame stutters badly on a phone.
  *
  * Small because the layer is only ever seen through a 26px blur. At 480px wide
  * it is indistinguishable from the full-size clip once blurred, and it costs a
@@ -33,11 +36,12 @@ class AmbientVideoEncoder
      * Longest clip worth reversing.
      *
      * ffmpeg's `reverse` filter buffers every frame it will emit into memory,
-     * so this is a memory ceiling rather than a preference. Intro clips run a
-     * few seconds; anything claiming minutes is refused rather than allowed to
-     * exhaust the box.
+     * so this is a memory ceiling rather than a preference — twelve seconds at
+     * the source rate below is a couple of hundred megabytes held at once.
+     * Intro clips run a few seconds; anything longer is refused rather than
+     * allowed to exhaust the box.
      */
-    private const MAX_SECONDS = 20.0;
+    private const MAX_SECONDS = 12.0;
 
     /**
      * How much to stretch the footage out.
@@ -60,6 +64,14 @@ class AmbientVideoEncoder
      * cadence, which is what `fps` does here.
      */
     private const FPS = 30;
+
+    /**
+     * Rate the footage is normalised to before it is reversed.
+     *
+     * Lower than the output rate on purpose: this is the count `reverse` has to
+     * hold in memory, and the slowdown afterwards interpolates back up to FPS.
+     */
+    private const SOURCE_FPS = 24;
 
     /**
      * Encode a backdrop loop for a stored intro clip.
@@ -91,17 +103,25 @@ class AmbientVideoEncoder
             '-y',
             '-i', $source,
 
-            // Order matters. Scale first so `reverse` — which holds every frame
-            // it will emit in memory — buffers 480px frames rather than
-            // full-size ones. Then stretch the timestamps, then resample to a
-            // steady frame rate so the extra duration is filled with frames
-            // instead of held ones.
-            '-vf', implode(',', [
-                'scale='.self::WIDTH.':-2',
-                'reverse',
-                'setpts='.self::SLOWDOWN.'*PTS',
-                'fps='.self::FPS,
-            ]),
+            /* A palindrome: the footage forward, then the same footage
+               backward, joined. Looped, it runs out to the end and comes back
+               rather than cutting to a first frame, so there is no seam to see.
+
+               Order matters twice over. Scaling comes first because `reverse`
+               holds every frame it will emit in memory, and it should be
+               holding 480px frames rather than full-size ones. And the slowdown
+               comes *last*, after the join — stretching before it would triple
+               the frame count that reverse has to buffer for no benefit. */
+            '-filter_complex', '[0:v]'
+                .'scale='.self::WIDTH.':-2,'
+                .'fps='.self::SOURCE_FPS.','
+                .'split[fwd][pre];'
+                .'[pre]reverse[rev];'
+                .'[fwd][rev]concat=n=2:v=1:a=0,'
+                .'setpts='.self::SLOWDOWN.'*PTS,'
+                .'fps='.self::FPS
+                .'[out]',
+            '-map', '[out]',
 
             // No audio at all: this layer is silent, and the music owns sound.
             '-an',

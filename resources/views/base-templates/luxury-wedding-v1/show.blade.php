@@ -314,6 +314,14 @@ body::before {
   overflow: hidden;
   background: color-mix(in srgb, var(--gold) 22%, transparent);
 }
+#loading p {
+  margin: 0;
+  font-size: .82rem;
+  letter-spacing: calc(.24em * var(--tk));
+  color: var(--gold-deep);
+  opacity: .75;
+}
+
 #loading .pulse i {
   display: block;
   width: 40%;
@@ -424,9 +432,11 @@ main.names-in:not(.revealed) .couple-section {
   transform: none;
 }
 
-main.names-in:not(.revealed) .couple {
-  transform: translateY(var(--lift, 0px));
-}
+/* No lift. The names appear at their final position and never move again.
+   Centring them on the clip and then travelling them home meant that at the
+   moment the rest of the page arrived, the names slid down to meet it — the
+   jump. Everything above them still occupies its space while invisible, so
+   where they land during the clip is exactly where they stay. */
 
 .couple-section > .hosts,
 .couple-section > .rule {
@@ -437,7 +447,7 @@ main.revealed .couple-section > .hosts,
 main.revealed .couple-section > .rule { opacity: 1; }
 
 /* Long and soft: this one move is what the whole sequence is built around. */
-.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease); }
+.couple { transition: color 1.4s var(--ease-soft); }
 main > .couple-section { transition: opacity 1.1s var(--ease); }
 
 /* Phase two: the rest, staggered. The step is set per element from one place
@@ -937,6 +947,7 @@ footer {
 <path d="M354.21 11.77C354.89 11.57 355.16 13.71 355.33 14.24C356.26 17.05 356.48 20.03 357.32 22.86C359.44 30.06 362.47 37.16 366.49 43.52C370.45 49.79 376.47 55.06 382.92 58.58C384.15 59.25 391.5 62.14 391.66 62.85C391.96 64.19 384.09 66.43 382.54 67.18C377.2 69.75 372.25 73.89 368.29 78.25C363.32 83.72 359.51 91.09 357 97.99C356.63 99.03 354.74 105.3 354.41 105.34C353.54 105.44 353.19 103.86 353.07 103.31C352.48 100.72 351.7 98.22 350.8 95.71C348.8 90.14 345.34 83.93 341.47 79.44C337.03 74.28 331.52 69.98 325.32 67.16C324.17 66.63 316.59 63.99 316.41 63.51C316.01 62.39 317.48 62.03 318.21 61.79C320.64 61 323.14 59.78 325.38 58.54C331.32 55.27 336.39 50.9 340.43 45.42C345.68 38.31 348.92 29.34 351.44 20.96C351.8 19.76 353.39 12.02 354.21 11.77ZM326.29 125.17C327.75 124.8 327.05 131.63 326.88 132.65C325.54 140.49 323.64 148.13 320.87 155.59C317.82 163.83 313.2 171.49 308.43 178.84C298.22 194.56 286.2 208.25 273.19 221.71C251.61 244 228.16 264.45 205.67 285.78C192.37 298.4 178.5 310.67 167.24 325.22C148.39 349.55 137.5 377.1 137.65 408.13C137.82 443.32 153.95 475.95 176.43 502.21C187.54 515.19 200.53 526.43 212.96 538.11C224.99 549.41 237.4 560.39 249.62 571.49C258.78 579.8 268.31 587.85 277.07 596.58C296.35 615.79 321.42 636.02 333.41 660.7C336.28 666.61 335.31 676.6 335.3 683.14C335.3 684.09 335.43 689.83 334.49 690.06C333.73 690.25 333.03 688.81 332.76 688.34C331.54 686.27 330.21 684.26 328.93 682.24C323.55 673.75 316.76 666.41 309.74 659.29C298.1 647.49 285.18 636.94 272.94 625.8C262.85 616.62 252.45 607.8 242.27 598.73C234.69 591.98 227.4 584.84 219.67 578.26C211.81 571.57 204.01 564.71 196.38 557.77C194.07 555.67 191.97 553.3 189.59 551.3C174.34 538.48 159.65 524.51 147.42 508.75C125.24 480.16 111.69 444.7 111.22 408.37C111.04 394.73 112.4 381.8 115.66 368.58C119.46 353.19 125.81 338.25 134.13 324.77C146.52 304.71 163.28 288.52 180.4 272.58C195.96 258.09 211.79 243.86 227.32 229.33C232.66 224.34 238.32 219.67 243.54 214.54C264.47 193.97 287.9 175.44 306.58 152.63C311.91 146.13 316.94 139.6 321.53 132.55C322.23 131.47 325.41 125.39 326.29 125.17ZM382.38 125.15C383.32 124.68 384.65 127.56 384.98 128.22C387.02 132.28 389.62 136.18 392.35 139.8C399.68 149.52 407.69 158.83 416.16 167.58C430.74 182.63 446.38 197 462.07 210.89C473.4 220.92 484.14 231.6 495.4 241.69C504.89 250.19 514.05 259.05 523.52 267.54C542.23 284.3 559.86 301.73 573.93 322.67C582.86 335.96 589.12 351.15 593.23 366.55C596.89 380.24 598.46 393.93 598.02 408.13C597.54 423.4 595.46 438.44 590.86 453.03C576.67 497.99 547.87 527.1 513.3 557.21C496.75 571.62 480.64 586.57 464.23 601.14C450.73 613.13 436.97 624.84 423.58 636.94C413.2 646.32 402.42 655.1 392.82 665.34C387.19 671.34 382.02 677.43 377.35 684.21C376.63 685.25 373.59 691.05 372.62 691.04C371.47 691.03 371.88 684.9 371.9 683.85C372.03 676.63 370.95 667.83 374.18 661.14C380.25 648.54 389.88 638.4 399.48 628.45C409.72 617.85 420.29 607.6 431.02 597.51C450.53 579.14 470.72 561.48 490.31 543.2C506.49 528.11 523.51 513.68 537.5 496.45C557.25 472.14 569.66 442.83 571.4 411.45C573.15 379.68 561.15 349.27 541.65 324.66C533.65 314.57 524.24 305.8 515.04 296.84C493.03 275.38 469.73 255.26 448.08 233.4C438.03 223.26 427.38 213.67 418.27 202.63C408.93 191.31 399.57 179.3 393.06 166.06C389.94 159.69 387.82 153.18 385.27 146.62C383.27 141.5 382.88 135.94 382.26 130.52C382.17 129.72 381.69 125.49 382.38 125.15ZM354.22 208.3C355.4 208.04 356.02 211.02 356.32 211.8C357.89 215.85 360.03 219.84 362.36 223.5C368.88 233.72 376.24 243.6 384.32 252.67C403.59 274.26 423.94 296.21 431.86 324.86C438.11 347.5 435.92 373.84 435.91 397.25C435.91 403.4 435.87 409.55 435.82 415.7C435.79 418.61 436.33 422.17 435.17 424.92C434.31 426.96 432.04 428.8 430.57 430.45C426.51 435.03 422.06 439.38 418.37 444.26C415.81 447.64 413.22 450.97 410.73 454.39C410.05 455.32 408.85 457.67 407.56 457.82C406.42 457.95 406.63 455.33 406.63 454.76C406.63 451.13 406.62 447.49 406.67 443.87C406.86 428.65 406.68 413.41 406.68 398.19C406.68 379.82 408.54 354.96 403.64 337.47C398.34 318.51 386.74 302.56 373.86 287.97C369.05 282.52 363.98 277 359.78 271.05C359.07 270.05 355.36 265 354.41 264.95C353.16 264.89 349.9 269.68 349.01 270.8C344.17 276.89 339.04 282.74 333.99 288.67C320.99 303.93 309.51 320.07 304.43 339.76C302.34 347.9 302.39 356.71 302.27 365.06C302.09 376.49 302.08 387.94 302.19 399.38C302.3 412.23 302.16 425.09 302.18 437.95C302.18 443 302.21 448.05 302.1 453.1C302.07 454.22 302.36 458.18 300.29 457.16C298.75 456.4 297.64 454.07 296.66 452.74C294.46 449.73 292 446.79 289.63 443.91C286.12 439.65 282.64 435.29 278.81 431.31C276.9 429.33 274.02 427.46 273.04 424.76C271.88 421.58 272.69 417.15 272.66 413.81C272.6 405.61 272.58 397.4 272.58 389.2C272.58 367.47 271.31 345.59 276.98 324.4C284.68 295.65 307.03 271.09 326.68 249.65C334.62 240.99 342.26 230.95 347.78 220.58C349.41 217.52 350.84 214.49 352.27 211.33C352.65 210.5 353.17 208.53 354.22 208.3ZM179.8 402.41C181.79 401.69 188.43 404.9 190.63 405.66C201.39 409.37 211.89 413.73 222.18 418.6C227.35 421.04 232.66 423.24 237.63 426.11C277.97 449.38 305.75 479.43 327.89 520.18C335.2 533.64 342.7 549.94 347.96 564.3C349.32 568.01 351.07 571.65 352.22 575.43C352.48 576.3 352.86 578.93 353.94 578.97C354.97 579.01 354.98 577.6 355.23 576.87C356.08 574.45 357.08 572.09 357.98 569.69C361.75 559.66 365.98 549.82 370.11 539.92C374.34 529.78 379.83 519.81 385.63 510.48C393.47 497.86 401.21 485.34 411.05 474.12C434.77 447.12 464.26 427.68 497.12 413.46C504.77 410.15 512.7 407.6 520.46 404.6C522.17 403.94 527.01 401.53 528.64 402.76C529.93 403.74 529.46 409.8 529.44 411.45C529.4 417.12 529.31 422.81 529.36 428.49C529.4 431.42 529.81 434.57 529.48 437.48C529.12 440.52 520.2 440.49 517.46 441.39C513.32 442.75 509.1 443.74 505.01 445.27C497.23 448.19 489.45 452.17 482.26 456.35C453.31 473.17 428.77 496.55 411.2 525.15C391.33 557.51 378.48 593.62 366.41 629.42C363.54 637.93 359.95 646.2 357.17 654.75C356.79 655.93 354.7 662.63 353.49 662.4C352.74 662.27 352.26 660.6 352.07 660.01C351.26 657.48 350.61 654.85 349.48 652.44C347.97 649.19 346.96 645.6 345.74 642.21C343.02 634.67 340.33 627.14 337.6 619.6C328.05 593.22 318.93 566.22 305.81 541.35C298.13 526.81 288.99 513.28 278.84 500.37C261.98 478.93 236.95 461.06 212.57 449.29C205.62 445.94 198.26 443.01 190.73 441.27C188.04 440.65 181.44 440.61 179.52 439.02C178.02 437.78 178.82 433.35 178.83 431.56C178.84 424.54 178.88 417.52 178.8 410.5C178.78 408.76 177.67 403.18 179.8 402.41Z" fill="currentColor" fill-rule="evenodd" stroke="currentColor" stroke-width="0.25" stroke-linejoin="round"/>
 </svg>
         <div class="pulse"><i></i></div>
+        <p>{{ __('invitation.loading') }}</p>
     </div>
 
     <div id="prompt">
@@ -1252,7 +1263,7 @@ if (muteBtn) {
    Nothing moves between beats. The names are released in their final position
    and stay there — what changes is what else is visible around them. */
 let opened = false, named = false, revealed = false;
-let fadeTimer = null, namesTimer = null, softTimer = null;
+let fadeTimer = null, namesTimer = null;
 
 /* Where each beat falls, once the clip's duration is known. */
 let marks = null;
@@ -1348,25 +1359,6 @@ function showNames() {
     if (named) return;
     named = true;
 
-    // Belt and braces: a stalled or very short clip can reach this without the
-    // scheduled soften having fired, and sharp footage under the names is the
-    // one thing this sequence must not do.
-    softenBackdrop();
-
-    // How far to lift the names so they sit in the middle of the clip.
-    //
-    // Measured now, before the class lands, because this reads the element
-    // where it will finally sit — the page is unscrolled and nothing is
-    // transformed yet, so its own box is the honest answer. Measuring after
-    // would be measuring the lift that was just applied.
-    const names = content.querySelector('.couple');
-
-    if (names) {
-        const box = names.getBoundingClientRect();
-        const lift = (window.innerHeight / 2) - (box.top + box.height / 2);
-
-        content.style.setProperty('--lift', Math.round(lift) + 'px');
-    }
 
     content.classList.add('names-in');
 }
@@ -1417,73 +1409,64 @@ function startPetals() {
     }, CONFIG.petalsMs);
 }
 
-/* ── the backdrop softens ───────────────────────────────────────────
-   The clip does not stop being the backdrop when the invitation arrives — it
-   becomes it, blurred past recognition and dimmed, so the glass panels have
-   something moving to refract.
+/* ── the clip hands over ────────────────────────────────────────────
+   Called as the clip dissolves, never before it.
 
-   This runs *before* the names, not after the reveal. Blurring afterwards meant
-   the content appeared over footage that was still sharp and only softened once
-   everything was already on screen.
+   An earlier version blurred the footage a second ahead of the names, which
+   inverted the whole sequence: by the time the names arrived the video was
+   already gone, so what a guest saw was a blank page and then text sliding in.
+   The names belong *on* the clip while it is still playing and still sharp —
+   that is the moment the invitation is built around — and only once they are
+   there does it fade.
 
-   Nothing is ever paused and restarted here. The old handover paused the intro
-   at the end of the clip and then called play() with loop on, which sent it
-   back to frame zero — visibly, at full opacity, while the blur was still
-   ramping in. That restart is the flash. */
-let softened = false;
-
-function softenBackdrop() {
-    if (softened) return;
-    softened = true;
+   What remains underneath is the same footage blurred and faint, or the
+   palindrome encode where one exists, so the page keeps moving quietly. */
+function handOver() {
+    if (handedOver) return;
+    handedOver = true;
 
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    if (intro) {
-        // Set before the clip can reach its end, so it wraps rather than
-        // stopping — a loop that is already running has no first frame to
-        // jump back to that anyone can see through a 30px blur.
-        //
-        // Left at its own speed. Slowing playback in the browser is what made
-        // the backdrop stutter, and behind a 30px blur at this opacity the
-        // difference between real time and a third of it barely registers.
-        intro.loop = true;
+    if (!intro) return;
+
+    if (still) {
+        // Motion is what the preference is about. Hold a soft frozen frame.
         intro.classList.add('ambient');
+        intro.pause();
 
-        // Motion is what the preference is about; the blur is not. Hold a soft
-        // frozen frame rather than removing the layer.
-        if (still) {
-            intro.pause();
-
-            return;
-        }
-
-        // It is normally already running by now, but not when the invitation
-        // was opened without an intro at all — a language switch arrives here
-        // with nothing playing, and a paused first frame is not a backdrop.
-        if (intro.paused) {
-            intro.muted = true;
-            intro.play().catch(() => {});
-        }
+        return;
     }
 
-    if (still || !ambient) return;
+    if (ambient) {
+        /* The palindrome takes over: it runs forward then backward, so it never
+           cuts back to a first frame. Started before the intro is faded so the
+           two overlap and nothing blinks between them. */
+        ambient.muted = true;
+        ambient.loop = true;
 
-    /* The reversed encode takes over. Both layers are blurred to the same
-       degree by now, so the crossfade has nothing recognisable in it — which is
-       the only reason the swap can happen mid-view at all. */
-    ambient.muted = true;
-    ambient.loop = true;
-    ambient.playbackRate = 1;
+        ambient.play().then(() => {
+            ambient.classList.add('on');
+            intro.classList.add('done');
+            watchVisibility(ambient);
+        }).catch(() => {
+            // No encode playable, so the intro stays on as the backdrop.
+            intro.classList.add('ambient');
+            watchVisibility(intro);
+        });
 
-    ambient.play().then(() => {
-        ambient.classList.add('on');
-        if (intro) intro.classList.add('handed');
+        return;
+    }
 
-        watchVisibility(ambient);
-    }).catch(() => {
-        // Refused. The blurred intro is already standing in, so there is
-        // nothing to undo.
-    });
+    // No palindrome encode. The intro itself softens into the backdrop and
+    // keeps looping — set while it is still running, so it wraps rather than
+    // stopping and restarting where anyone could see it.
+    intro.loop = true;
+    intro.classList.add('ambient');
+
+    if (intro.paused) {
+        intro.muted = true;
+        intro.play().catch(() => {});
+    }
 
     watchVisibility(intro);
 }
@@ -1494,9 +1477,7 @@ function watchVisibility(layer) {
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) layer.pause();
-        else if (layer.classList.contains('ambient') || layer.classList.contains('on')) {
-            layer.play().catch(() => {});
-        }
+        else layer.play().catch(() => {});
     });
 }
 
@@ -1514,7 +1495,6 @@ function armSequence() {
     if (!isFinite(d) || d <= 0) {
         // Duration unknown, so lead times mean nothing. Show the names now
         // rather than leave the clip playing over an empty page.
-        softenBackdrop();
         showNames();
 
         return;
@@ -1524,11 +1504,9 @@ function armSequence() {
 
     const wait = at => Math.max(0, (at - intro.currentTime) * 1000);
 
-    clearTimeout(softTimer);
     clearTimeout(namesTimer);
     clearTimeout(fadeTimer);
 
-    softTimer = setTimeout(softenBackdrop, wait(marks.soften));
     namesTimer = setTimeout(showNames, wait(marks.names));
     fadeTimer = setTimeout(reveal, wait(marks.reveal));
 }
@@ -1559,18 +1537,18 @@ function cues(d) {
 
        The cap is the important number. Whatever the duration, the leads never
        take more than this share, so at least the rest of the clip plays sharp. */
-    const want = (CONFIG.namesLeadMs + CONFIG.blurLeadMs) / 1000;
-    const scale = want > 0 ? Math.min(1, (d * 0.35) / want) : 1;
+    const want = CONFIG.namesLeadMs / 1000;
+    const scale = want > 0 ? Math.min(1, (d * 0.32) / want) : 1;
 
     const back = ms => d - (ms / 1000) * scale;
 
-    const soften = back(CONFIG.namesLeadMs + CONFIG.blurLeadMs);
     const names = back(CONFIG.namesLeadMs);
 
-    // The names always keep the clip to themselves for a beat, however tight.
+    // The names always get the clip to themselves for a beat, however tight —
+    // that pause is the whole effect.
     const reveal = Math.max(names + 0.5, back(CONFIG.fadeOutLeadMs));
 
-    return { soften, names, reveal };
+    return { names, reveal };
 }
 
 if (intro) {
@@ -1582,7 +1560,6 @@ if (intro) {
         // moment the schedule would not have.
         const at = marks ?? cues(d);
 
-        if (intro.currentTime >= at.soften) softenBackdrop();
         if (intro.currentTime >= at.names) showNames();
         if (intro.currentTime >= at.reveal) reveal();
     });
@@ -1615,8 +1592,11 @@ function reveal() {
     startPetals();
     armScrollCue();
 
-    // The clip keeps running as the backdrop — it was softened before the
-    // names arrived and is not touched again. Only the scrim goes.
+    // The clip dissolves on this same beat, and what it leaves behind is the
+    // quiet backdrop. One motion: names already up, footage going, content
+    // coming.
+    handOver();
+
     setTimeout(() => curtain.remove(), CONFIG.crossfadeMs + 200);
 }
 
@@ -1658,7 +1638,6 @@ function skipIntro() {
     named = true;
 
     curtain.classList.add('gone');
-    softenBackdrop();
 
     reveal();
 }

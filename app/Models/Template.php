@@ -22,10 +22,6 @@ class Template extends Model
         // the video to themselves before it starts dissolving.
         'namesLeadMs' => 2600,
 
-        // How far ahead of the names the backdrop starts blurring, so it is
-        // already soft before anything is asked to be read over it.
-        'blurLeadMs' => 1000,
-
         // How long petals keep falling after the reveal before thinning out.
         'petalsMs' => 22000,
         'crossfadeMs' => 1400,
