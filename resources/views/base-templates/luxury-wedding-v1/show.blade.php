@@ -1579,33 +1579,39 @@ function reveal() {
     // still lead, just by a shorter margin than intended.
     showNames();
 
-    curtain.classList.add('gone');
-
     // The clip must not stop while the crossfade is still running — if it
     // reaches its last frame it freezes visibly for the remainder. Looping
     // it makes the wrap invisible under the dissolve.
     if (intro) intro.loop = true;
 
-    // The stagger step comes from the element's own position, counted here
-    // rather than written into the stylesheet — sections are conditional, so a
-    // verse-less invitation would otherwise leave a hole in the sequence.
-    Array.from(content.children).forEach((el, i) => el.style.setProperty('--i', i));
+    // Let the browser paint the white-centred names FIRST. Without this frame
+    // break, 'names-in' and 'revealed' land in the same style recalc — the
+    // :not(.revealed) rule that sets color:#fff never visually applies, so the
+    // transition has no "from" value and the colour snaps instead of fading.
+    requestAnimationFrame(() => {
+        curtain.classList.add('gone');
 
-    content.classList.add('revealed');
-    if (muteBtn) muteBtn.classList.add('on');
-    if (langs) langs.classList.add('on');
-    settleMusic();
-    release();
-    startPetals();
-    armScrollCue();
+        // The stagger step comes from the element's own position, counted here
+        // rather than written into the stylesheet — sections are conditional, so
+        // a verse-less invitation would otherwise leave a hole in the sequence.
+        Array.from(content.children).forEach((el, i) => el.style.setProperty('--i', i));
 
-    // Once the crossfade has fully dissolved the clip, pause it and hand
-    // off to the ambient layer.
-    setTimeout(() => {
-        if (intro) intro.pause();
-        curtain.remove();
-        startAmbient();
-    }, CONFIG.crossfadeMs + 200);
+        content.classList.add('revealed');
+        if (muteBtn) muteBtn.classList.add('on');
+        if (langs) langs.classList.add('on');
+        settleMusic();
+        release();
+        startPetals();
+        armScrollCue();
+
+        // Once the crossfade has fully dissolved the clip, pause it and hand
+        // off to the ambient layer.
+        setTimeout(() => {
+            if (intro) intro.pause();
+            curtain.remove();
+            startAmbient();
+        }, CONFIG.crossfadeMs + 200);
+    });
 }
 
 /* ── language switching ─────────────────────────────────────────
