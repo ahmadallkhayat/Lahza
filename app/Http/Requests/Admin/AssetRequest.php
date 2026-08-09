@@ -7,6 +7,7 @@ use App\Support\BaseTemplates;
 use App\Support\UploadLimit;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class AssetRequest extends FormRequest
 {
@@ -84,6 +85,19 @@ class AssetRequest extends FormRequest
         // Written kinds. 4000 rather than 1000: a verse with its translation
         // beneath it runs long, and this is the one field with no other
         // ceiling on it.
+        if ($this->kind() === Asset::KIND_TEXT) {
+            // One box per language, and at least one of them filled. The
+            // required rule sits on the array rather than on any single
+            // language: which languages a block is written in is the studio's
+            // choice, but a block written in none of them is not a block.
+            $rules['body'] = ['required', 'array'];
+            $rules['body.*'] = ['nullable', 'string', 'max:4000'];
+
+            $rules['field'] = ['nullable', Rule::in(array_keys(Asset::textFields()))];
+
+            return $rules;
+        }
+
         $rules['body'] = ['required', 'string', 'max:4000'];
         $rules['locale'] = ['nullable', Rule::in(array_keys(config('templates.locales')))];
 
@@ -95,13 +109,38 @@ class AssetRequest extends FormRequest
             $rules['translation.*'] = ['nullable', 'string', 'max:4000'];
             $rules['reference'] = ['array'];
             $rules['reference.*'] = ['nullable', 'string', 'max:255'];
-
-            return $rules;
         }
 
-        $rules['field'] = ['nullable', Rule::in(array_keys(Asset::textFields()))];
-
         return $rules;
+    }
+
+    /**
+     * A text block has to say something somewhere.
+     *
+     * `required` on the array cannot express this: the array arrives with a key
+     * per language and is therefore never empty, however blank every box in it
+     * is. Which languages get filled is the studio's choice — none of them is
+     * not a choice.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        if ($this->kind() !== Asset::KIND_TEXT) {
+            return;
+        }
+
+        $validator->after(function (Validator $validator) {
+            $written = array_filter(
+                (array) $this->input('body', []),
+                fn ($value) => is_string($value) && trim($value) !== ''
+            );
+
+            if ($written === []) {
+                $validator->errors()->add(
+                    'body',
+                    'Write the text in at least one language.'
+                );
+            }
+        });
     }
 
     /**
@@ -159,7 +198,18 @@ class AssetRequest extends FormRequest
             );
             $data['reference'] = $this->perLocale($data['reference'] ?? []);
         } else {
-            $data['locale'] = filled($data['locale'] ?? null) ? $data['locale'] : null;
+            /* Text: one body per language, stored as a map keyed by locale.
+
+               `locale` is not written here and not read for text any more —
+               which language a block is in became a property of each box
+               rather than of the row. The stored value is left alone rather
+               than nulled, so the migration that folded these rows into maps
+               still has the information it needs to be reversed. */
+            $data['body'] = json_encode(
+                $this->perLocale($data['body'] ?? []) ?? [],
+                JSON_UNESCAPED_UNICODE
+            );
+
             $data['field'] = filled($data['field'] ?? null) ? $data['field'] : null;
             $data['translation'] = null;
             $data['reference'] = null;

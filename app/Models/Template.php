@@ -22,6 +22,13 @@ class Template extends Model
         // the video to themselves before it starts dissolving.
         'namesLeadMs' => 2600,
 
+        // How long the softened backdrop has the screen to itself before the
+        // rest of the invitation arrives. This is the gap that makes the blur
+        // its own beat: the names sit over the clip, the clip softens, and only
+        // then does the content assemble. Set it to 0 and the blur happens
+        // behind arriving content, which is what it used to do.
+        'blurLeadMs' => 1200,
+
         // How long petals keep falling after the reveal before thinning out.
         'petalsMs' => 22000,
         'crossfadeMs' => 1400,

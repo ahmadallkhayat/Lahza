@@ -20,8 +20,18 @@
     class="space-y-6"
     x-data="assetForm(@js([
         'kind' => $kind,
-        'body' => (string) old('body', $asset->body),
-        'locale' => (string) old('locale', $asset->locale),
+
+        // A text block is written in every language at once, so this is a map
+        // rather than a string. old() wins on a failed submit; otherwise the
+        // stored map, which Asset::bodies() has already decoded.
+        'bodies' => collect($locales)
+            ->map(fn ($m, $code) => (string) old("body.$code", $asset->bodies()[$code] ?? ''))
+            ->all(),
+
+        // The verse keeps its single box: it is Arabic whoever is reading.
+        'verseBody' => (string) old('body', $asset->isVerse() ? $asset->body : ''),
+
+        'locales' => array_keys($locales),
         'aliases' => Placeholders::aliases(),
         'samples' => Placeholders::samples(),
         'rtl' => collect($locales)->map(fn ($m) => (bool) $m['rtl'])->all(),
@@ -197,7 +207,7 @@
                     x-bind:disabled="! isVerse"
                     dir="rtl"
                     lang="ar"
-                    x-model="body"
+                    x-model="verseBody"
                     class="block w-full rounded-lg border-ink-300 bg-white text-base leading-loose text-ink-800 shadow-sm focus:border-brand-500 focus:ring-brand-500 @error('body') border-bad-400 @enderror"
                     placeholder="وَمِنْ آيَاتِهِ أَنْ خَلَقَ لَكُم مِّنْ أَنفُسِكُمْ أَزْوَاجًا"
                 ></textarea>
@@ -272,97 +282,116 @@
 <div x-show="isText" x-cloak class="space-y-6">
     <x-ui.card title="Text" description="Written once, inserted into any invitation with the names filled in.">
         <div class="space-y-5">
-            <div class="grid gap-5 sm:grid-cols-2">
-                <x-ui.field
-                    label="Language"
-                    name="locale"
-                    hint="Sets the writing direction. Leave unset for something language-neutral."
-                >
-                    <x-ui.select name="locale" x-model="locale">
-                        <option value="">Not language specific</option>
-                        @foreach ($locales as $code => $meta)
-                            <option value="{{ $code }}" @selected(old('locale', $asset->locale) === $code)>
-                                {{ $meta['label'] }}
-                            </option>
-                        @endforeach
-                    </x-ui.select>
-                </x-ui.field>
-
-                <x-ui.field
-                    label="What it is for"
-                    name="field"
-                    hint="Sets which section of the library it sits in, and which field offers it first. Any block can still be inserted anywhere."
-                >
-                    <x-ui.select name="field">
-                        <option value="">Anything</option>
-                        @foreach (Asset::textFields() as $value => $label)
-                            <option value="{{ $value }}" @selected(old('field', $asset->field) === $value)>{{ $label }}</option>
-                        @endforeach
-                    </x-ui.select>
-                </x-ui.field>
-            </div>
-
-            <div>
-                <x-ui.label for="body" required>The text</x-ui.label>
-
-                {{-- Placeholder buttons rather than a list to copy from: the
-                     exact spelling stops mattering, and the token lands at the
-                     cursor instead of at the end. --}}
-                <div class="mb-2 flex flex-wrap items-center gap-1.5">
-                    <span class="text-xs text-ink-500">Insert:</span>
-                    @foreach (Placeholders::all() as $token)
-                        <button
-                            type="button"
-                            x-on:click="insert('{{ $token['token'] }}')"
-                            class="rounded-md bg-ink-100 px-2 py-0.5 font-mono text-xs text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-700"
-                            title="{{ $token['label'] }}"
-                        >{{ '{'.$token['token'].'}' }}</button>
+            <x-ui.field
+                label="What it is for"
+                name="field"
+                hint="Sets which section of the library it sits in, and which field offers it first. Any block can still be inserted anywhere."
+                class="sm:max-w-sm"
+            >
+                <x-ui.select name="field">
+                    <option value="">Anything</option>
+                    @foreach (Asset::textFields() as $value => $label)
+                        <option value="{{ $value }}" @selected(old('field', $asset->field) === $value)>{{ $label }}</option>
                     @endforeach
+                </x-ui.select>
+            </x-ui.field>
+
+            {{-- One box per language, all on the page at once.
+                 A hosting line is the same sentence in three languages, and
+                 this used to be one box plus a language dropdown — so saying
+                 that took three library rows, three things to keep in step and
+                 three separate Inserts on an invitation. Every language a block
+                 is written in now lives on the row that block is.
+
+                 Languages may be left empty. A block written only in Arabic is
+                 a perfectly good block; it just has one language to offer. --}}
+            <div class="space-y-5">
+                <div>
+                    <x-ui.label required>The text</x-ui.label>
+                    <p class="mt-1 text-xs text-ink-500">
+                        Written in each language you want to offer it in. Leave a language empty to skip it —
+                        at least one has to be filled.
+                    </p>
+                    <x-ui.error name="body" />
                 </div>
 
-                <textarea
-                    name="body"
-                    id="body"
-                    rows="5"
-                    x-bind:disabled="! isText"
-                    x-ref="body"
-                    x-model="body"
-                    :dir="dir"
-                    class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm placeholder:text-ink-400 focus:border-brand-500 focus:ring-brand-500 @error('body') border-bad-400 @enderror"
-                    placeholder="{{ 'تتشرف عائلة {groom} وعائلة {bride} بدعوتكم' }}"
-                ></textarea>
+                @foreach ($locales as $code => $meta)
+                    <div class="rounded-lg border border-ink-200 p-4">
+                        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-ink-500">
+                                {{ $meta['label'] }}
+                            </span>
 
-                <p class="mt-1.5 text-xs text-ink-500">
-                    Any of the tokens above. Spelling is forgiving — {bride}, {bridename} and {bride_name} all work.
-                </p>
+                            {{-- Placeholder buttons rather than a list to copy
+                                 from: the exact spelling stops mattering, and
+                                 the token lands at the cursor of this
+                                 language's box instead of at the end. --}}
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="text-xs text-ink-500">Insert:</span>
+                                @foreach (Placeholders::all() as $token)
+                                    <button
+                                        type="button"
+                                        x-on:click="insert('{{ $code }}', '{{ $token['token'] }}')"
+                                        class="rounded-md bg-ink-100 px-2 py-0.5 font-mono text-xs text-ink-700 transition-colors hover:bg-brand-50 hover:text-brand-700"
+                                        title="{{ $token['label'] }}"
+                                    >{{ '{'.$token['token'].'}' }}</button>
+                                @endforeach
+                            </div>
+                        </div>
 
-                <x-ui.error name="body" />
+                        <textarea
+                            name="body[{{ $code }}]"
+                            id="body_{{ $code }}"
+                            rows="4"
+                            {{-- The verse card holds a body box too and only one
+                                 card is on screen. Disabling the other keeps it
+                                 out of the submission, so the form never posts
+                                 `body` as both a string and an array. --}}
+                            x-bind:disabled="! isText"
+                            x-ref="body_{{ $code }}"
+                            x-model="bodies['{{ $code }}']"
+                            @if ($meta['rtl']) dir="rtl" @endif
+                            lang="{{ $code }}"
+                            class="block w-full rounded-lg border-ink-300 bg-white text-sm text-ink-800 shadow-sm placeholder:text-ink-400 focus:border-brand-500 focus:ring-brand-500 @error('body.'.$code) border-bad-400 @enderror"
+                            placeholder="{{ $meta['rtl']
+                                ? 'تتشرف عائلة {groom} وعائلة {bride} بدعوتكم'
+                                : 'The families of {groom} and {bride} request the honour of your presence' }}"
+                        ></textarea>
 
-                {{-- A token nothing can fill is worth saying now rather than
-                     after it reaches a customer's invitation. Not an error:
-                     braces may well be intentional prose. --}}
-                <template x-if="unknown.length > 0">
-                    <div class="mt-2 flex items-start gap-2 rounded-lg border border-warn-600/20 bg-warn-50 px-3 py-2 text-xs text-warn-700">
-                        <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                        <span>
-                            Nothing fills
-                            <span class="font-mono" x-text="unknownList"></span>
-                            — it will appear exactly as written.
-                        </span>
+                        <x-ui.error :name="'body.'.$code" />
+
+                        {{-- Sample values, not a real invitation's: this block is
+                             not attached to one yet, and the point is the shape
+                             of the sentence. --}}
+                        <template x-if="String(bodies['{{ $code }}'] ?? '').trim() !== ''">
+                            <p
+                                class="mt-2 whitespace-pre-line border-t border-ink-100 pt-2 text-xs leading-relaxed text-ink-500"
+                                @if ($meta['rtl']) dir="rtl" @endif
+                                x-text="preview('{{ $code }}')"
+                            ></p>
+                        </template>
+
+                        {{-- A token nothing can fill is worth saying now rather
+                             than after it reaches a customer's invitation. Not
+                             an error: braces may well be intentional prose. --}}
+                        <template x-if="unknown('{{ $code }}').length > 0">
+                            <div class="mt-2 flex items-start gap-2 rounded-lg border border-warn-600/20 bg-warn-50 px-3 py-2 text-xs text-warn-700">
+                                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                <span>
+                                    Nothing fills
+                                    <span class="font-mono" x-text="unknownList('{{ $code }}')"></span>
+                                    — it will appear exactly as written.
+                                </span>
+                            </div>
+                        </template>
                     </div>
-                </template>
+                @endforeach
+
+                <p class="text-xs text-ink-500">
+                    Spelling is forgiving — {bride}, {bridename} and {bride_name} all work.
+                </p>
             </div>
         </div>
-    </x-ui.card>
-
-    {{-- Sample values, not a real invitation's: this block is not attached to
-         one yet, and the point is the shape of the sentence. --}}
-    <x-ui.card title="Preview" description="With sample names in place of the placeholders.">
-        <p
-            class="whitespace-pre-line text-sm leading-relaxed text-ink-800"
-            :dir="dir"
-            x-text="preview || 'Nothing written yet.'"
-        ></p>
     </x-ui.card>
 </div>
 

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 
 /**
  * A reusable piece of an invitation: an intro clip, a music track, or a block
@@ -311,7 +312,87 @@ class Asset extends Model
 
     public function isRtl(): bool
     {
-        return (bool) config("templates.locales.{$this->locale}.rtl", false);
+        return self::rtlFor($this->locale);
+    }
+
+    /** Whether a given language is written right-to-left. */
+    public static function rtlFor(?string $locale): bool
+    {
+        return (bool) config("templates.locales.{$locale}.rtl", false);
+    }
+
+    /* ── written content ──────────────────────────────────────────── */
+
+    /**
+     * What this block says, one entry per language.
+     *
+     * A text asset carries a map: the same hosting line in Arabic, Kurdish and
+     * English is one library row, not three. A verse carries a single Arabic
+     * body that every language prints as-is, so it has no map and returns none.
+     *
+     * Both shapes share the `body` column, and this is the only place they are
+     * told apart — nothing downstream should read the raw attribute.
+     *
+     * @return array<string, string>
+     */
+    public function bodies(): array
+    {
+        if (! $this->isText()) {
+            return [];
+        }
+
+        $raw = trim((string) ($this->body ?? ''));
+
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        // Written before bodies were per-language, or a row the migration did
+        // not reach: the whole string is the text, in the language the row was
+        // filed under. Handled rather than assumed away, so a half-applied
+        // migration degrades to the old behaviour instead of an empty library.
+        if (! is_array($decoded)) {
+            $locale = $this->locale ?: (string) array_key_first((array) config('templates.locales'));
+
+            return [$locale => $raw];
+        }
+
+        return array_filter(
+            array_map(fn ($v) => is_string($v) ? trim($v) : '', $decoded),
+            fn ($v) => $v !== ''
+        );
+    }
+
+    /**
+     * What this block says in one language.
+     *
+     * Falls back to any language that has something, so a block written only in
+     * Arabic still inserts into an English card rather than inserting nothing —
+     * the studio can then translate it in place.
+     */
+    public function bodyIn(?string $locale = null): ?string
+    {
+        // A verse is Arabic in every language, so there is nothing to choose.
+        if (! $this->isText()) {
+            return filled($this->body) ? (string) $this->body : null;
+        }
+
+        $bodies = $this->bodies();
+
+        if ($bodies === []) {
+            return null;
+        }
+
+        return ($locale !== null ? ($bodies[$locale] ?? null) : null)
+            ?? Arr::first($bodies);
+    }
+
+    /** Languages this block has actually been written in. */
+    public function writtenLocales(): array
+    {
+        return array_keys($this->bodies());
     }
 
     /**
@@ -320,9 +401,12 @@ class Asset extends Model
      *
      * @param  array<string, string|null>|null  $values
      */
-    public function render(?array $values = null): string
+    public function render(?array $values = null, ?string $locale = null): string
     {
-        return Placeholders::render($this->body, $values ?? Placeholders::samples());
+        return Placeholders::render(
+            $this->bodyIn($locale) ?? '',
+            $values ?? Placeholders::samples()
+        );
     }
 
     /* ── media ownership ──────────────────────────────────────────── */

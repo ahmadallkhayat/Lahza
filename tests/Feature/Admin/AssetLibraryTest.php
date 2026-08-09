@@ -244,7 +244,7 @@ class AssetLibraryTest extends TestCase
         $this->post('/admin/assets', [
             'kind' => Asset::KIND_TEXT,
             'name' => 'Both families',
-            'body' => 'The families of {groom} and {bride}',
+            'body' => ['en' => 'The families of {groom} and {bride}'],
             'translation' => ['en' => 'smuggled'],
             'reference' => ['en' => 'smuggled'],
         ])->assertSessionHasNoErrors();
@@ -321,26 +321,65 @@ class AssetLibraryTest extends TestCase
         );
     }
 
-    public function test_a_text_asset_stores_its_body(): void
+    /**
+     * A block is written in every language at once, so one row carries them
+     * all — the same sentence used to need one row per language.
+     */
+    public function test_a_text_asset_stores_a_body_per_language(): void
     {
         $this->post('/admin/assets', [
             'kind' => Asset::KIND_TEXT,
             'name' => 'Both families',
-            'body' => 'The families of {groom} and {bride} invite you',
-            'locale' => 'en',
+            'body' => [
+                'ar' => 'تتشرف عائلة {groom} وعائلة {bride}',
+                'en' => 'The families of {groom} and {bride} invite you',
+            ],
             'field' => 'hosts',
             'is_active' => '1',
         ])->assertSessionHasNoErrors();
 
         $asset = Asset::sole();
 
-        $this->assertSame('The families of {groom} and {bride} invite you', $asset->body);
-        $this->assertSame('en', $asset->locale);
+        $this->assertSame([
+            'ar' => 'تتشرف عائلة {groom} وعائلة {bride}',
+            'en' => 'The families of {groom} and {bride} invite you',
+        ], $asset->bodies());
+
         $this->assertSame('hosts', $asset->field);
+
+        // Each language reads on its own, and asking for one that was left
+        // empty falls back rather than returning nothing.
+        $this->assertSame('The families of {groom} and {bride} invite you', $asset->bodyIn('en'));
+        $this->assertSame('تتشرف عائلة {groom} وعائلة {bride}', $asset->bodyIn('ar'));
+        $this->assertNotNull($asset->bodyIn('ku'));
 
         // No base template chosen means shared, which is one value and not two.
         $this->assertNull($asset->base_template);
         $this->assertNull($asset->path);
+    }
+
+    /** A language left empty is absent, not stored blank. */
+    public function test_untouched_languages_are_not_stored(): void
+    {
+        $this->post('/admin/assets', [
+            'kind' => Asset::KIND_TEXT,
+            'name' => 'Arabic only',
+            'body' => ['ar' => 'تتشرف عائلة {groom}', 'ku' => '', 'en' => '   '],
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(['ar'], Asset::sole()->writtenLocales());
+    }
+
+    /** Which languages is the studio's choice; none of them is not. */
+    public function test_a_text_asset_needs_at_least_one_language(): void
+    {
+        $this->post('/admin/assets', [
+            'kind' => Asset::KIND_TEXT,
+            'name' => 'Empty',
+            'body' => ['ar' => '', 'ku' => '', 'en' => ''],
+        ])->assertSessionHasErrors('body');
+
+        $this->assertSame(0, Asset::count());
     }
 
     public function test_a_media_asset_needs_a_file(): void
@@ -384,16 +423,23 @@ class AssetLibraryTest extends TestCase
 
     public function test_the_body_can_be_edited_without_re_uploading_anything(): void
     {
-        $asset = Asset::factory()->create(['body' => 'Old text']);
+        $asset = Asset::factory()->create([
+            'body' => json_encode(['en' => 'Old text'], JSON_UNESCAPED_UNICODE),
+        ]);
 
         $this->put("/admin/assets/{$asset->id}", [
             'kind' => Asset::KIND_TEXT,
             'name' => $asset->name,
-            'body' => 'New text with {bride}',
+            'body' => ['en' => 'New text with {bride}', 'ar' => 'نص جديد مع {bride}'],
             'is_active' => '1',
         ])->assertSessionHasNoErrors();
 
-        $this->assertSame('New text with {bride}', $asset->fresh()->body);
+        // Editing adds the language that was not there before rather than
+        // replacing the row, which is the whole point of one row per block.
+        $this->assertSame([
+            'ar' => 'نص جديد مع {bride}',
+            'en' => 'New text with {bride}',
+        ], $asset->fresh()->bodies());
     }
 
     /** A rename must not require re-uploading a 300MB clip. */

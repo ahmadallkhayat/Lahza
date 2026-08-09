@@ -20,8 +20,14 @@ class AssetFactory extends Factory
             'name' => 'Asset '.Str::random(5),
             'description' => null,
             'path' => null,
-            'body' => 'تتشرف عائلة {groom} وعائلة {bride} بدعوتكم',
-            'locale' => 'ar',
+            // A text body is one entry per language, stored as a map. The verse
+            // state below overrides it with a plain string, which is the shape
+            // that kind keeps.
+            'body' => json_encode([
+                'ar' => 'تتشرف عائلة {groom} وعائلة {bride} بدعوتكم',
+                'en' => 'The families of {groom} and {bride} invite you',
+            ], JSON_UNESCAPED_UNICODE),
+            'locale' => null,
             'translation' => null,
             'reference' => null,
             'field' => 'hosts',

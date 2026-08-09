@@ -8,12 +8,22 @@
  * Two jobs: show only the fields the chosen kind actually uses, and — for text
  * assets — substitute placeholders live so the studio can see what a block
  * will read like before an invitation exists.
+ *
+ * A text block is written in every language at once, so most of what follows
+ * is per-language: one box, one preview and one unknown-token warning each.
+ * A verse keeps a single body, because the verse is Arabic whoever is reading.
  */
 export default function assetForm(config) {
     return {
         kind: config.kind,
-        body: config.body,
-        locale: config.locale,
+
+        /** Text assets: { ar: '…', ku: '…', en: '…' }. */
+        bodies: config.bodies,
+
+        /** Verse assets: the Arabic verse, one box. */
+        verseBody: config.verseBody,
+
+        locales: config.locales,
 
         // Both come from App\Support\Placeholders, so the browser's
         // substitution and the server's cannot disagree about what
@@ -43,16 +53,20 @@ export default function assetForm(config) {
 
         /**
          * A religious verse: its own kind, with a translation and a reference
-         * beside the verse itself. Shares the body box with text, which is why
-         * both bind the same state.
+         * beside the verse itself.
          */
         get isVerse() {
             return this.kind === 'verse';
         },
 
-        /** Direction for the body box — the text is written in one language. */
-        get dir() {
-            return this.locale && this.rtl[this.locale] ? 'rtl' : 'ltr';
+        /** Writing direction for a given language's box. */
+        dirFor(locale) {
+            return this.rtl[locale] ? 'rtl' : 'ltr';
+        },
+
+        /** Languages with something written in them. */
+        get written() {
+            return this.locales.filter(code => String(this.bodies[code] ?? '').trim() !== '');
         },
 
         /** Resolve any accepted spelling to its canonical token, or null. */
@@ -67,13 +81,13 @@ export default function assetForm(config) {
         },
 
         /**
-         * The body with sample values in place of its placeholders.
+         * One language's text with sample values in place of its placeholders.
          *
          * An unrecognised token is left as written rather than emptied: a
          * visible {grom} is a typo someone can see, a silently blank one is not.
          */
-        get preview() {
-            return String(this.body ?? '').replace(/\{\s*([a-z0-9_]+)\s*\}/gi, (whole, token) => {
+        preview(locale) {
+            return String(this.bodies[locale] ?? '').replace(/\{\s*([a-z0-9_]+)\s*\}/gi, (whole, token) => {
                 const name = this.canonical(token);
 
                 return name && this.samples[name] ? this.samples[name] : whole;
@@ -81,8 +95,8 @@ export default function assetForm(config) {
         },
 
         /** Tokens nothing will ever fill, so the form can say so while typing. */
-        get unknown() {
-            const found = String(this.body ?? '').match(/\{\s*[a-z0-9_]+\s*\}/gi) ?? [];
+        unknown(locale) {
+            const found = String(this.bodies[locale] ?? '').match(/\{\s*[a-z0-9_]+\s*\}/gi) ?? [];
 
             const bad = found
                 .map(whole => whole.replace(/[{}\s]/g, ''))
@@ -92,29 +106,33 @@ export default function assetForm(config) {
         },
 
         /** The same list, written out — so the markup holds no expression. */
-        get unknownList() {
-            return this.unknown.map(token => '{' + token + '}').join(', ');
+        unknownList(locale) {
+            return this.unknown(locale).map(token => '{' + token + '}').join(', ');
         },
 
         /**
-         * Drop a placeholder in at the cursor, so a token can be added without
-         * remembering its exact spelling or hand-typing the braces.
+         * Drop a placeholder in at the cursor of one language's box, so a token
+         * can be added without remembering its exact spelling or hand-typing
+         * the braces.
+         *
+         * Each box has its own ref, because there is a row of them now and the
+         * caret belongs to whichever one the studio is typing in.
          */
-        insert(token) {
-            const field = this.$refs.body;
+        insert(locale, token) {
+            const field = this.$refs['body_' + locale];
             const text = '{' + token + '}';
+            const value = String(this.bodies[locale] ?? '');
 
             if (! field) {
-                this.body = String(this.body ?? '') + text;
+                this.bodies[locale] = value + text;
 
                 return;
             }
 
-            const start = field.selectionStart ?? field.value.length;
+            const start = field.selectionStart ?? value.length;
             const end = field.selectionEnd ?? start;
-            const value = String(this.body ?? '');
 
-            this.body = value.slice(0, start) + text + value.slice(end);
+            this.bodies[locale] = value.slice(0, start) + text + value.slice(end);
 
             // Put the caret after what was just inserted, on the next tick —
             // Alpine has not written the new value into the field yet.

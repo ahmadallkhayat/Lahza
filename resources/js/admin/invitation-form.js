@@ -275,12 +275,17 @@ export default function invitationForm(config) {
         },
 
         /**
-         * Drop the chosen block into a field.
+         * Drop the chosen block into a field, in every language it was written
+         * in.
          *
-         * It goes into its own language when that language is on this
-         * invitation — a Kurdish verse belongs in the Kurdish column — and into
-         * the default language otherwise. Which column it landed in is stated
-         * rather than left to be noticed.
+         * A block carries one body per language now, so one Insert fills the
+         * Arabic, Kurdish and English cards together — it used to be three
+         * library rows found and inserted one at a time. Languages the block
+         * was never written in are left untouched rather than blanked, so a
+         * card already filled by hand survives an insert that has nothing to
+         * say about it.
+         *
+         * Which columns were filled is stated rather than left to be noticed.
          */
         insertAsset(field) {
             const id = this.picked[field];
@@ -289,16 +294,49 @@ export default function invitationForm(config) {
             const asset = this.assets.find(a => String(a.id) === String(id));
             if (! asset) return;
 
+            const bodies = asset.bodies ?? {};
+
             // An Arabic-everywhere slot has one box, held under the default
-            // language — so a block filed as Arabic still lands in it rather
-            // than in a column that field does not have.
-            const target = this.arabicFields.includes(field)
-                ? this.def
-                : (asset.locale && this.has(asset.locale) ? asset.locale : this.def);
+            // language. There is only one place for the text to go, so the
+            // block's own default language is what lands in it.
+            if (this.arabicFields.includes(field)) {
+                const body = bodies[this.def] ?? Object.values(bodies)[0];
+                if (body == null) return;
 
-            this.text[field][target] = this.resolveText(asset.body, target);
+                this.text[field][this.def] = this.resolveText(body, this.def);
+                this.assetNote[field] = asset.name + ' → ' + (this.labels[this.def] ?? this.def);
+                this.picked[field] = '';
 
-            this.assetNote[field] = asset.name + ' → ' + (this.labels[target] ?? target);
+                return;
+            }
+
+            // Only the languages this invitation is actually issued in: a block
+            // written in three is not a reason to grow a fourth column.
+            const filled = Object.keys(bodies)
+                .filter(locale => this.has(locale))
+                .filter(locale => String(bodies[locale] ?? '').trim() !== '');
+
+            if (filled.length === 0) {
+                // Written only in languages this invitation does not use. Put
+                // it in the default column rather than doing nothing silently —
+                // it is still the block that was asked for.
+                const body = Object.values(bodies)[0];
+                if (body == null) return;
+
+                this.text[field][this.def] = this.resolveText(body, this.def);
+                this.assetNote[field] = asset.name + ' → ' + (this.labels[this.def] ?? this.def);
+                this.picked[field] = '';
+
+                return;
+            }
+
+            filled.forEach(locale => {
+                this.text[field][locale] = this.resolveText(bodies[locale], locale);
+            });
+
+            this.assetNote[field] = asset.name + ' → '
+                + filled.map(locale => this.labels[locale] ?? locale).join(', ');
+
             this.picked[field] = '';
         },
 

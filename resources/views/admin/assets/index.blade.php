@@ -159,10 +159,23 @@
                                     @elseif ($asset->kind === Asset::KIND_MUSIC && $asset->path)
                                         <audio src="{{ $asset->path }}" class="w-56 max-w-full" controls preload="none"></audio>
                                     @elseif ($asset->isText())
-                                        <p
-                                            class="max-w-sm truncate text-xs text-ink-600"
-                                            @if ($asset->isRtl()) dir="rtl" @endif
-                                        >{{ $asset->body }}</p>
+                                        {{-- One line per language the block was written in. A
+                                             hosting line is one row carrying three languages
+                                             now, and a list that showed only one of them would
+                                             hide the two that are also about to be inserted. --}}
+                                        <div class="max-w-sm space-y-1">
+                                            @foreach ($asset->bodies() as $code => $text)
+                                                <p
+                                                    class="flex items-baseline gap-2 text-xs text-ink-600"
+                                                    @if (Asset::rtlFor($code)) dir="rtl" @endif
+                                                >
+                                                    <span class="shrink-0 text-[0.6rem] font-semibold uppercase tracking-wider text-ink-400">
+                                                        {{ config("templates.locales.{$code}.short", strtoupper($code)) }}
+                                                    </span>
+                                                    <span class="truncate">{{ $text }}</span>
+                                                </p>
+                                            @endforeach
+                                        </div>
                                     @else
                                         <span class="text-xs text-ink-400">Missing file</span>
                                     @endif

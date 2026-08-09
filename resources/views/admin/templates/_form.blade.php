@@ -24,6 +24,8 @@
         'keepVideoAudioMs' => ['Keep video audio', 'ms before muting the clip. 0 keeps it silent throughout.'],
         'musicFadeMs' => ['Music fade in', 'ms for the music to reach full volume.'],
         'fadeOutLeadMs' => ['Dissolve lead', 'ms before the clip ends that the crossfade begins.'],
+        'namesLeadMs' => ['Names lead', 'ms before the clip ends that the names appear over it.'],
+        'blurLeadMs' => ['Blur hold', 'ms the softened clip holds alone before the content arrives.'],
         'crossfadeMs' => ['Dissolve length', 'ms for the video to dissolve into the invitation.'],
         'duckTo' => ['Music duck level', '0–1. Volume once the invitation is showing.'],
         'fogHz' => ['Muffle cutoff', 'Hz low-pass after the reveal. Lower sounds more distant.'],

@@ -98,37 +98,36 @@ class AssetLibrarySeeder extends Seeder
      */
     private function hostingLines(): void
     {
-        $lines = [
+        /* One row carrying all three languages, not three rows carrying one
+           each. The sentence is the same thing in every language, so inserting
+           it should be one action — which is what the per-language body makes
+           possible. The three old rows are retired below. */
+        Asset::updateOrCreate(
+            ['kind' => Asset::KIND_TEXT, 'name' => 'Both families'],
             [
-                'name' => 'Both families — Arabic',
-                'locale' => 'ar',
-                'body' => 'تتشرف عائلة {groom} وعائلة {bride} بدعوتكم لحضور حفل زفاف ولديهما',
-            ],
-            [
-                'name' => 'Both families — Kurdish',
-                'locale' => 'ku',
-                'body' => 'خێزانی {groom} و خێزانی {bride} بە خۆشحاڵییەوە بانگهێشتتان دەکەن بۆ ئاهەنگی هاوسەرگیری منداڵەکانیان',
-            ],
-            [
-                'name' => 'Both families — English',
-                'locale' => 'en',
-                'body' => 'The families of {groom} and {bride} request the honour of your presence '
-                    .'at the wedding of their children on {date} at {venue}',
-            ],
-        ];
+                'base_template' => null,
+                'field' => 'hosts',
+                'body' => json_encode([
+                    'ar' => 'تتشرف عائلة {groom} وعائلة {bride} بدعوتكم لحضور حفل زفاف ولديهما',
+                    'ku' => 'خێزانی {groom} و خێزانی {bride} بە خۆشحاڵییەوە بانگهێشتتان دەکەن بۆ ئاهەنگی هاوسەرگیری منداڵەکانیان',
+                    'en' => 'The families of {groom} and {bride} request the honour of your presence '
+                        .'at the wedding of their children on {date} at {venue}',
+                ], JSON_UNESCAPED_UNICODE),
+                'description' => 'Placeholders are filled in when it is inserted.',
+                'is_active' => true,
+            ]
+        );
 
-        foreach ($lines as $line) {
-            Asset::updateOrCreate(
-                ['kind' => Asset::KIND_TEXT, 'name' => $line['name']],
-                [
-                    'base_template' => null,
-                    'field' => 'hosts',
-                    'locale' => $line['locale'],
-                    'body' => $line['body'],
-                    'description' => 'Placeholders are filled in when it is inserted.',
-                    'is_active' => true,
-                ]
-            );
-        }
+        // The per-language rows this replaces. Deleted rather than left
+        // inactive: they say exactly what the row above says, and a library
+        // offering the same line four times is the problem, not the fix.
+        Asset::query()
+            ->where('kind', Asset::KIND_TEXT)
+            ->whereIn('name', [
+                'Both families — Arabic',
+                'Both families — Kurdish',
+                'Both families — English',
+            ])
+            ->delete();
     }
 }

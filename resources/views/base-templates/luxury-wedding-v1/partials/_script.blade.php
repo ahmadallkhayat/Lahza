@@ -125,16 +125,28 @@ if (muteBtn) {
 }
 
 /* ── the sequence ───────────────────────────────────────────────────
-   Three beats, not one:
+   Three beats, and each one gets the screen to itself:
 
-     1. the names alone, over the running clip, reading as its inverse
-     2. the clip dissolves and the names settle into their own colour
-     3. the rest of the invitation arrives and the page unlocks
+     1. the clip plays sharp; near its end the names appear over it,
+        reading as its inverse
+     2. the clip softens to the backdrop it will stay as, with the names
+        still the only thing on it — this is a beat, not a transition
+     3. the rest of the invitation assembles and the page unlocks
+
+   Beat two used to happen underneath beat three, which is why the blur never
+   registered as anything: by the time the eye reached it there was content on
+   top. blurLeadMs is the gap that separates them.
 
    Nothing moves between beats. The names are released in their final position
    and stay there — what changes is what else is visible around them. */
 let opened = false, named = false, revealed = false;
 let fadeTimer = null, namesTimer = null;
+
+/* Set when the invitation is entered from a language switch. The beats below
+   are all played out over time, and there is nothing to play out when the
+   guest has already watched the intro once — so it marks them as instant
+   rather than giving the skip path its own copy of the same steps. */
+let skipping = false;
 
 /* Where each beat falls, once the clip's duration is known. */
 let marks = null;
@@ -201,16 +213,38 @@ curtain.addEventListener('click', () => {
 
     if (intro) {
         intro.classList.add('playing');
-        intro.muted = CONFIG.keepVideoAudioMs === 0;
+
+        /* Muted, and played synchronously inside the click.
+
+           Both halves of that matter, and getting either wrong is what made the
+           clip sometimes not play at all. A silent video is the only kind a
+           browser will always start; this used to unmute first whenever
+           keepVideoAudioMs was set, so the call was at the browser's discretion.
+           And the call has to happen in the click's own tick — it was wrapped in
+           a 50ms setTimeout for an iOS frozen-frame bug, which spent the user
+           gesture, so by the time play() ran there was no gesture left to
+           authorise it. It rejected, and .catch(reveal) then threw away the
+           whole intro. Hence: mute, play now, and deal with audio once it runs. */
+        intro.muted = true;
         if (intro.currentTime > 0.1) {
             intro.currentTime = 0;
         }
 
-        // Give iOS Safari a tick to process the muted property change before playing,
-        // which prevents the bug where audio plays but the video frame is frozen.
-        setTimeout(() => {
-            intro.play().then(armSequence).catch(reveal);
-        }, 50);
+        intro.play().then(() => {
+            // Safe here in a way it is not before play(): flipping `muted` in
+            // the same tick as the call is what froze the frame on iOS Safari,
+            // but playback is already running by the time this resolves.
+            if (CONFIG.keepVideoAudioMs > 0) {
+                intro.muted = false;
+            }
+
+            armSequence();
+        }).catch(() => {
+            // Even muted playback was refused, so there is no duration to hang
+            // the sequence off. The names still lead, just on a timer.
+            showNames();
+            setTimeout(reveal, 900);
+        });
     } else {
         // No clip: the names still lead, just on a timer rather than a duration.
         showNames();
@@ -320,6 +354,18 @@ function startAmbient() {
     // We don't artificially slow the intro fallback anymore because it stutters.
     if (layer === ambient) {
         layer.playbackRate = 1;
+
+        /* Hand the backdrop over rather than leaving both stacked.
+
+           #intro.handed exists for this and nothing was ever adding it, so the
+           intro sat at .18 underneath the loop's .22 for the whole visit —
+           two decodes running, and the intro's frozen last frame showing
+           through. Both are blurred identically by now, so the cross is
+           invisible; once it is done the intro has nothing left to show. */
+        if (intro) {
+            intro.classList.add('handed');
+            setTimeout(() => intro.pause(), CONFIG.crossfadeMs + 200);
+        }
     }
 
     layer.loop = true;
@@ -439,13 +485,44 @@ function reveal() {
     // still lead, just by a shorter margin than intended.
     showNames();
 
-    // The clip must not stop while the crossfade is still running — if it
-    // reaches its last frame it freezes visibly for the remainder. Looping
-    // it makes the wrap invisible under the dissolve.
+    // The clip keeps running right through the blur and is only handed over
+    // once the backdrop loop is ready to take it. Reaching its last frame would
+    // freeze it visibly, and it is on screen for all of this.
     if (intro) intro.loop = true;
 
+    /* ── beat two: the clip softens, alone.
+       The names are the only thing on screen and stay that way while this
+       happens. That is the whole point of the pause before beat three — a blur
+       that resolves behind arriving content is a blur nobody sees. */
+    if (intro) intro.classList.add('ambient');
     curtain.classList.add('gone');
 
+    // Nothing to play out when the intro was skipped: there was no sharp clip
+    // to soften and no blend to undo, so every beat lands at once.
+    const settle = skipping ? 0 : CONFIG.crossfadeMs;
+    const blurLead = skipping ? 0 : CONFIG.blurLeadMs;
+
+    // Once the footage is soft there is nothing sharp left to invert against,
+    // so the names come off blend mode and settle into their own ink.
+    setTimeout(() => content.classList.remove('blending'), settle);
+
+    // ── beat three: the rest of the invitation, once the blur has landed.
+    setTimeout(showContent, blurLead);
+
+    // The backdrop loop takes over for the rest of the visit.
+    setTimeout(() => {
+        curtain.remove();
+        startAmbient();
+    }, blurLead + settle);
+}
+
+/**
+ * Beat three on its own.
+ *
+ * Split out of reveal() so the blur can hold the screen before it, and so the
+ * skip path reaches exactly these steps rather than a second list of them.
+ */
+function showContent() {
     // The stagger step comes from the element's own position, counted here
     // rather than written into the stylesheet — sections are conditional, so a
     // verse-less invitation would otherwise leave a hole in the sequence.
@@ -458,19 +535,6 @@ function reveal() {
     release();
     startPetals();
     armScrollCue();
-
-    // Once the clip is out of sight the names have nothing left to invert
-    // against, so they come off blend mode and take their own colour.
-    setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
-
-    // Let the clip run through the whole dissolve — pausing here is what
-    // made it look like it stopped and then faded. startAmbient() is what
-    // finally blurs it back, so the content arrives over sharp, moving footage.
-    setTimeout(() => {
-        if (intro) intro.pause();
-        curtain.remove();
-        startAmbient();
-    }, CONFIG.crossfadeMs + 200);
 }
 
 /* ── language switching ─────────────────────────────────────────
@@ -509,6 +573,11 @@ function skipIntro() {
     // No clip to centre on and none to blur out of, so neither beat has
     // anything to do — but they must be marked done or reveal() will run them.
     named = true;
+
+    // Collapses reveal()'s waits to nothing. Without it the guest would watch
+    // blurLeadMs of empty softened backdrop, scroll-locked, before the
+    // invitation they have already seen once turned up again.
+    skipping = true;
 
     curtain.classList.add('gone');
 

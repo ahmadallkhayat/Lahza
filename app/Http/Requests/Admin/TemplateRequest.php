@@ -64,6 +64,8 @@ class TemplateRequest extends FormRequest
             'settings.keepVideoAudioMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
             'settings.musicFadeMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
             'settings.fadeOutLeadMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
+            'settings.namesLeadMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
+            'settings.blurLeadMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
             'settings.crossfadeMs' => ['nullable', 'integer', 'min:100', 'max:60000'],
             'settings.duckTo' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'settings.fogHz' => ['nullable', 'integer', 'min:100', 'max:20000'],

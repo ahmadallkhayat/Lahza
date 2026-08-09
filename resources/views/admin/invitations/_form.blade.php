@@ -108,12 +108,15 @@
 
     // Ready-written blocks from the library, flattened to what the browser
     // needs to insert one and fill in its placeholders.
+    // `bodies` is a map keyed by language, so one Insert fills every language
+    // card at once — the same block used to be three library rows found and
+    // inserted separately. A language the block was never written in is simply
+    // absent from the map and its card is left alone.
     $assetOptions = $textAssets
         ->map(fn ($asset) => [
             'id' => $asset->id,
             'name' => $asset->name,
-            'body' => (string) $asset->body,
-            'locale' => $asset->locale,
+            'bodies' => $asset->bodies(),
             'field' => $asset->field,
         ])
         ->values()
