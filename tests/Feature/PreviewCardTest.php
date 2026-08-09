@@ -37,20 +37,21 @@ class PreviewCardTest extends TestCase
     }
 
     /**
-     * And falls back to a default image when there is not a custom one.
+     * And promises nothing when there is not.
      *
-     * This satisfies scrapers (like WhatsApp/Instagram) that require an image
-     * to render a preview card.
+     * The page used to declare summary_large_image unconditionally while
+     * carrying no og:image at all, so a scraper reserved room for a picture
+     * that never arrived and rendered a broken-looking card.
      */
-    public function test_the_page_falls_back_to_default_image_when_none_provided(): void
+    public function test_the_page_promises_no_image_when_it_has_none(): void
     {
         $invitation = $this->invitation(['og_image' => null]);
 
         $html = $this->get('/i/'.$invitation->slug)->assertOk()->getContent();
 
-        $this->assertStringContainsString('og:image', $html);
-        $this->assertStringContainsString('og-image.png', $html);
-        $this->assertStringContainsString('summary_large_image', $html);
+        $this->assertStringNotContainsString('og:image', $html);
+        $this->assertStringNotContainsString('summary_large_image', $html);
+        $this->assertStringContainsString('twitter:card', $html);
     }
 
     public function test_the_card_url_is_absolute(): void

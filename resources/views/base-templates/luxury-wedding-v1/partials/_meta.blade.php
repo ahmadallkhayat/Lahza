@@ -35,14 +35,9 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="{{ url($invitation->og_image) }}">
 @else
-    {{-- Fallback image when the invitation has no specific og_image set --}}
-    <meta property="og:image" content="{{ asset('og-image.png') }}">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="{{ $invitation->groom_ar }} & {{ $invitation->bride_ar }}">
-    
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:image" content="{{ asset('og-image.png') }}">
+    {{-- No card, so no promise of one: summary_large_image without an image
+         makes a scraper reserve space it cannot fill. --}}
+    <meta name="twitter:card" content="summary">
 @endif
 
 <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
