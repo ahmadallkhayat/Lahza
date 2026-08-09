@@ -251,7 +251,7 @@ function showNames() {
         content.style.setProperty('--lift', Math.round(lift) + 'px');
     }
 
-    content.classList.add('names-in');
+    content.classList.add('blending', 'names-in');
 }
 
 /* Start the dissolve before the clip runs out so it fades while still in
@@ -444,32 +444,33 @@ function reveal() {
     // it makes the wrap invisible under the dissolve.
     if (intro) intro.loop = true;
 
-    // Let the browser paint the white-centred names FIRST. Without this frame
-    // break, 'names-in' and 'revealed' land in the same style recalc — the
-    // :not(.revealed) rule that sets color:#fff never visually applies, so the
-    // transition has no "from" value and the colour snaps instead of fading.
-    requestAnimationFrame(() => {
-        // All three fire on the same frame: video blurs, curtain dissolves,
-        // content appears. Nothing else is ever visible over a sharp video.
-        if (intro) intro.classList.add('ambient');
-        curtain.classList.add('gone');
+    curtain.classList.add('gone');
 
-        Array.from(content.children).forEach((el, i) => el.style.setProperty('--i', i));
+    // The stagger step comes from the element's own position, counted here
+    // rather than written into the stylesheet — sections are conditional, so a
+    // verse-less invitation would otherwise leave a hole in the sequence.
+    Array.from(content.children).forEach((el, i) => el.style.setProperty('--i', i));
 
-        content.classList.add('revealed');
-        if (muteBtn) muteBtn.classList.add('on');
-        if (langs) langs.classList.add('on');
-        settleMusic();
-        release();
-        startPetals();
-        armScrollCue();
+    content.classList.add('revealed');
+    if (muteBtn) muteBtn.classList.add('on');
+    if (langs) langs.classList.add('on');
+    settleMusic();
+    release();
+    startPetals();
+    armScrollCue();
 
-        setTimeout(() => {
-            if (intro) intro.pause();
-            curtain.remove();
-            startAmbient();
-        }, CONFIG.crossfadeMs + 200);
-    });
+    // Once the clip is out of sight the names have nothing left to invert
+    // against, so they come off blend mode and take their own colour.
+    setTimeout(() => content.classList.remove('blending'), CONFIG.crossfadeMs);
+
+    // Let the clip run through the whole dissolve — pausing here is what
+    // made it look like it stopped and then faded. startAmbient() is what
+    // finally blurs it back, so the content arrives over sharp, moving footage.
+    setTimeout(() => {
+        if (intro) intro.pause();
+        curtain.remove();
+        startAmbient();
+    }, CONFIG.crossfadeMs + 200);
 }
 
 /* ── language switching ─────────────────────────────────────────

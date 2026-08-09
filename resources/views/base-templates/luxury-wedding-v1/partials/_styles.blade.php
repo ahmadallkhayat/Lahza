@@ -87,12 +87,11 @@ body::before {
   object-fit: cover;
 }
 
-/* The intro plays sharp, then hands over. */
-/* The softening is quicker than the crossfade on purpose: it has to finish
-   inside blurLeadMs, before the names are asked to sit over it. */
+/* The intro plays sharp, then hands over. Tied to --fade (crossfadeMs) so the
+   clip's dissolve and the curtain's are the same length by construction. */
 #intro {
   opacity: 0;
-  transition: opacity 1.8s var(--ease-soft), filter 1.8s var(--ease-soft);
+  transition: opacity var(--fade) var(--ease-soft), filter var(--fade) var(--ease-soft);
 }
 #intro.playing { opacity: 1; }
 
@@ -208,7 +207,7 @@ body::before {
   text-align: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 500ms var(--ease);
+  transition: opacity 420ms var(--ease);
 }
 #prompt.ready { opacity: 1; pointer-events: auto; }
 #prompt.gone { opacity: 0; pointer-events: none; }
@@ -262,7 +261,7 @@ main {
 main > * {
   opacity: 0;
   transform: translateY(18px);
-  transition: opacity 2s var(--ease), transform 2s var(--ease);
+  transition: opacity 1s var(--ease), transform 1s var(--ease);
 }
 
 /* Phase one: the names alone, centred on the clip.
@@ -280,20 +279,6 @@ main > * {
    travels. The line above the names and the rule below them belong to the laid
    out page and arrive with it — lifting the whole block moved all three onto
    the clip, which is not what was asked for. */
-/* ── Names over the clip ─────────────────────────────────────────
-   One colour, all the way through.
-
-   These used to invert against the footage with mix-blend-mode: difference,
-   which did exactly what it promises — recomputed per frame — so on real
-   footage the names strobed black to white to black as the clip moved. The
-   effect only existed because the backdrop was an opaque dark sheet and the
-   names had to fight it.
-
-   The backdrop is now transparent and softened to almost nothing before the
-   names appear, so what they sit on is paper with a faint blur drifting under
-   it. Legible, unchanging, and the same colour they end on — nothing to
-   transition and nothing to flicker. */
-
 main.names-in:not(.revealed) .couple-section {
   opacity: 1;
   transform: none;
@@ -302,11 +287,31 @@ main.names-in:not(.revealed) .couple-section {
 main.names-in:not(.revealed) .couple {
   /* Lifted to the center of the viewport so the names sit over the clip. */
   transform: translateY(var(--lift, 0px));
-  /* Clean white with a soft shadow — legible over any footage without the
-     strobing that mix-blend-mode: difference caused on moving video. */
+}
+
+/* ── Names over the clip ─────────────────────────────────────────
+   While the video is still running the names read as the inverse of whatever
+   is behind them: white on a dark frame, black on a bright one, changing as
+   the footage does. `difference` against white gives exactly that, per pixel
+   and per frame, with no sampling and nothing to keep in sync.
+
+   This is why the clip sits at the bottom of the root stacking context and
+   why `main` carries no z-index — blending only reaches what is painted below
+   it in the same context.
+
+   The gold ampersand is exempt: inverting it turns it a muddy cyan. It holds
+   its own colour and simply fades in with the rest. */
+main.blending .couple {
   color: #fff;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5),
-               0 0 80px rgba(0, 0, 0, 0.25);
+  mix-blend-mode: difference;
+}
+main.blending .couple .amp { mix-blend-mode: normal; }
+
+/* Where blending is unavailable the names just use their own colour. Worth
+   stating rather than leaving to chance: the fallback for `difference` is no
+   blending at all, which on a dark frame would be dark ink on dark video. */
+@supports not (mix-blend-mode: difference) {
+  main.blending .couple { color: var(--paper); mix-blend-mode: normal; }
 }
 
 .couple-section > .hosts,
@@ -317,14 +322,9 @@ main.names-in:not(.revealed) .couple {
 main.revealed .couple-section > .hosts,
 main.revealed .couple-section > .rule { opacity: 1; }
 
-/* The one move: names glide from the centre of the clip to their home, color
-   fades from white to the page ink, shadow dissolves. Long and soft. */
-.couple {
-  transition: color 1.8s var(--ease-soft),
-              transform 2s var(--ease),
-              text-shadow 1.8s var(--ease-soft);
-}
-main > .couple-section { transition: opacity 1.3s var(--ease); }
+/* Long and soft: this one move is what the whole sequence is built around. */
+.couple { transition: color 1.4s var(--ease-soft), transform 1.6s var(--ease); }
+main > .couple-section { transition: opacity 1.1s var(--ease); }
 
 /* Phase two: the rest, staggered. The step is set per element from one place
    rather than a rule per position — the old nth-child(1..8) list meant a ninth
@@ -333,7 +333,7 @@ main > .couple-section { transition: opacity 1.3s var(--ease); }
 main.revealed > * {
   opacity: 1;
   transform: none;
-  transition-delay: calc(var(--i, 0) * 220ms);
+  transition-delay: calc(var(--i, 0) * 110ms);
 }
 
 @keyframes rise {
