@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Models\Invitation;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * The card a shared link shows: the couple's names, in the theme's colours.
@@ -70,7 +72,38 @@ class OgImageGenerator
      *
      * @return string|null null when it could not be drawn
      */
+    /**
+     * Draw the card, or give up quietly.
+     *
+     * A card is decorative and an invitation is not, so nothing in here is
+     * allowed to cost the studio the save it just made. The controller calls
+     * this straight after the write: an exception meant the row was already
+     * committed and the studio still got a 500, which read as "it failed" for
+     * something that had in fact worked.
+     *
+     * Only the ffmpeg call used to be guarded. Everything before it — writing
+     * the scratch files, making the target directory, formatting the date —
+     * ran unprotected, which is exactly where a server missing a writable
+     * storage/app/fonts throws.
+     */
     public function generate(Invitation $invitation): ?string
+    {
+        try {
+            return $this->draw($invitation);
+        } catch (Throwable $e) {
+            // Logged rather than swallowed: a card that silently never draws is
+            // a preview that silently never appears, and this is the only place
+            // that knows why.
+            Log::warning('The invitation card could not be drawn.', [
+                'invitation' => $invitation->slug,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function draw(Invitation $invitation): ?string
     {
         $names = $this->names($invitation);
 

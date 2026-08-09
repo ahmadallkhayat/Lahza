@@ -73,12 +73,21 @@
                      column; one with no language goes into the default. Which
                      column it landed in is said out loud — with three columns
                      side by side, guessing is not good enough. --}}
-                @if ($textAssets->isNotEmpty())
-                    @php
-                        $suits = $textAssets->filter(fn ($a) => $a->field === $field || blank($a->field));
-                        $others = $textAssets->reject(fn ($a) => $a->field === $field || blank($a->field));
-                    @endphp
+                @php
+                    /* Only blocks meant for this field, plus the ones filed
+                       under nothing in particular.
 
+                       Everything else used to be offered too, under an "Other
+                       text" heading, on the reasoning that a block filed as one
+                       thing might still read well as another. In practice it
+                       meant the hosting line offered you venue names and the
+                       venue offered you hosting lines — a list mostly made of
+                       answers to a different question. What a block is for is
+                       set when it is written; this trusts it. */
+                    $suits = $textAssets->filter(fn ($a) => $a->field === $field || blank($a->field));
+                @endphp
+
+                @if ($suits->isNotEmpty())
                     <div class="mb-2 flex flex-wrap items-center gap-2">
                         <select
                             x-model="picked.{{ $field }}"
@@ -87,25 +96,15 @@
                         >
                             <option value="">Insert premade text…</option>
 
-                            @if ($suits->isNotEmpty())
-                                <optgroup label="Suits this field">
-                                    @foreach ($suits as $asset)
-                                        <option value="{{ $asset->id }}">
-                                            {{ $asset->name }}{{ $asset->localeLabel() ? ' — '.$asset->localeLabel() : '' }}
-                                        </option>
-                                    @endforeach
-                                </optgroup>
-                            @endif
-
-                            @if ($others->isNotEmpty())
-                                <optgroup label="Other text">
-                                    @foreach ($others as $asset)
-                                        <option value="{{ $asset->id }}">
-                                            {{ $asset->name }}{{ $asset->localeLabel() ? ' — '.$asset->localeLabel() : '' }}
-                                        </option>
-                                    @endforeach
-                                </optgroup>
-                            @endif
+                            @foreach ($suits as $asset)
+                                <option value="{{ $asset->id }}">
+                                    {{-- The languages it carries, not the one it
+                                         is "in": a block is written in all of
+                                         them now, and which it has is what
+                                         decides how many cards Insert fills. --}}
+                                    {{ $asset->name }}@if ($written = $asset->writtenLocales()) — {{ collect($written)->map(fn ($c) => config("templates.locales.{$c}.short", strtoupper($c)))->implode(' ') }}@endif
+                                </option>
+                            @endforeach
                         </select>
 
                         <x-ui.button

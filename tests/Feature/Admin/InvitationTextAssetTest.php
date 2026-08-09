@@ -63,21 +63,34 @@ class InvitationTextAssetTest extends TestCase
     }
 
     /**
-     * The picker groups by whether a block suits the field it sits under, so a
-     * verse is still reachable from the hosting line without being the first
-     * thing offered there.
+     * A field only offers the blocks meant for it.
+     *
+     * Every block used to be offered under every field, sorted so the matching
+     * ones came first — which meant the hosting line's list was mostly venue
+     * names, and a venue could be inserted as a hosting line. What a block is
+     * for is decided when it is written, and the picker now honours that.
      */
-    public function test_blocks_are_grouped_by_what_they_suit(): void
+    public function test_a_field_is_not_offered_blocks_filed_for_another(): void
     {
         Asset::factory()->create(['name' => 'A hosting line', 'field' => 'hosts']);
-        Asset::factory()->create(['name' => 'A verse', 'field' => 'verse']);
+        Asset::factory()->create(['name' => 'A hall name', 'field' => 'venue_name']);
 
         $this->get($this->editUrl())
             ->assertOk()
-            ->assertSee('Suits this field')
-            ->assertSee('Other text')
             ->assertSee('A hosting line')
-            ->assertSee('A verse');
+            ->assertSee('A hall name')
+            // The grouping this replaces. Its absence is the fix.
+            ->assertDontSee('Other text');
+    }
+
+    /** A block filed under nothing stays offered everywhere — that is "Anything". */
+    public function test_an_unfiled_block_is_offered_under_every_field(): void
+    {
+        Asset::factory()->create(['name' => 'Fits anywhere', 'field' => null]);
+
+        $this->get($this->editUrl())
+            ->assertOk()
+            ->assertSee('Fits anywhere');
     }
 
     /**

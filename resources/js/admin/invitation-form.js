@@ -266,12 +266,17 @@ export default function invitationForm(config) {
             });
         },
 
-        /** Blocks worth offering for a field: its own first, then the rest. */
+        /**
+         * Blocks worth offering for a field: its own, plus the unfiled ones.
+         *
+         * Blocks filed for a different field are not offered. They used to be,
+         * after the matching ones, which meant the hosting line's list was
+         * mostly venue names and the venue's was mostly hosting lines. The
+         * markup filters the same way — both have to, or the select would show
+         * options this cannot resolve.
+         */
         assetsFor(field) {
-            const suits = this.assets.filter(a => a.field === field || ! a.field);
-            const others = this.assets.filter(a => a.field && a.field !== field);
-
-            return [...suits, ...others];
+            return this.assets.filter(a => a.field === field || ! a.field);
         },
 
         /**

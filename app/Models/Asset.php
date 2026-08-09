@@ -158,9 +158,13 @@ class Asset extends Model
     }
 
     /**
-     * What a text asset is meant for. Only a hint — the studio can insert any
-     * block into any field, since a blessing that was filed under "verse" is
-     * still a perfectly good hosting line.
+     * What a text asset is meant for, and where it will be offered.
+     *
+     * Binding, not a hint. The invitation form used to offer every block for
+     * every field on the reasoning that a block filed as one thing might read
+     * well as another — which in practice meant the hosting line offered you
+     * venue names. A block filed under nothing is still offered everywhere;
+     * that is what "Anything" is for.
      *
      * Derived from the core invitation fields plus every slot the base
      * templates declare, rather than written out here. This used to be a hand
