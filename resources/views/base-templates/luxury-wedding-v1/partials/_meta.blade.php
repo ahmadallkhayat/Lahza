@@ -6,22 +6,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{{ $invitation->groom_ar }} &amp; {{ $invitation->bride_ar }}</title>
 
-{{-- WhatsApp is the distribution channel, so the preview card matters. --}}
+@php
+    $description = $invitation->formattedDate() . ($invitation->text('venue_name') ? ' — '.$invitation->text('venue_name') : '');
+@endphp
+
+<!-- Search Engine -->
+<meta name="author" content="lahza-invites">
+<meta name="description" content="{{ $description }}">
+
+<!-- Open Graph -->
+<meta property="article:author" content="lahza-invites">
 <meta property="og:type" content="website">
 <meta property="og:title" content="{{ $invitation->groom_ar }} & {{ $invitation->bride_ar }}">
-<meta property="og:description" content="{{ $invitation->formattedDate() }}{{ $invitation->text('venue_name') ? ' — '.$invitation->text('venue_name') : '' }}">
+<meta property="og:description" content="{{ $description }}">
 <meta property="og:url" content="{{ $localeUrl($locale) }}">
+
+<!-- X/Twitter -->
+<meta name="twitter:title" content="{{ $invitation->groom_ar }} & {{ $invitation->bride_ar }}">
+<meta name="twitter:description" content="{{ $description }}">
+
 @if ($invitation->og_image)
     {{-- Absolute: a scraper does not resolve relative URLs. --}}
     <meta property="og:image" content="{{ url($invitation->og_image) }}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="{{ $invitation->groom_ar }} & {{ $invitation->bride_ar }}">
+    
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="{{ url($invitation->og_image) }}">
 @else
-    {{-- No card, so no promise of one: summary_large_image without an image
-         makes a scraper reserve space it cannot fill. --}}
-    <meta name="twitter:card" content="summary">
+    {{-- Fallback image when the invitation has no specific og_image set --}}
+    <meta property="og:image" content="{{ asset('og-image.png') }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="{{ $invitation->groom_ar }} & {{ $invitation->bride_ar }}">
+    
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="{{ asset('og-image.png') }}">
 @endif
 
 <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
