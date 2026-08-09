@@ -31,7 +31,7 @@ class TemplateController extends Controller
         return view('admin.templates.create', [
             'template' => new Template,
             'baseTemplates' => BaseTemplates::available(),
-            'library' => $this->library(null),
+            'library' => $this->library(null, everything: true),
         ]);
     }
 
@@ -202,13 +202,17 @@ class TemplateController extends Controller
      *
      * @return array<string, Collection<int, Asset>>
      */
-    private function library(?string $baseTemplate): array
+    private function library(?string $baseTemplate, bool $everything = false): array
     {
         $assets = Asset::query()
             ->active()
             ->whereIn('kind', Asset::MEDIA_KINDS)
             ->whereNotNull('path')
-            ->forBaseTemplate($baseTemplate)
+            // On create there is no design yet — it is chosen in this same
+            // form — so narrowing to the shared library would hide every clip
+            // that belongs to a design, which is most of them. The option list
+            // names the design each one belongs to instead.
+            ->when(! $everything, fn ($query) => $query->forBaseTemplate($baseTemplate))
             ->ordered()
             ->get();
 

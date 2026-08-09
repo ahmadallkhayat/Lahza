@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\Asset;
 use App\Models\Invitation;
 use App\Models\Template;
 use App\Models\User;
@@ -61,6 +62,36 @@ class TemplateRulesTest extends TestCase
     }
 
     /* ── what must be rejected ──────────────────────────────────── */
+
+    /**
+     * The create form offers every clip and track, not just the shared ones.
+     *
+     * No design has been chosen yet — it is picked in this same form — so
+     * narrowing the library to `base_template IS NULL` hid every asset that
+     * belongs to a design. Since the seeded clip and track belong to
+     * luxury-wedding-v1, that was all of them, and the picker was not drawn
+     * at all: the studio could only upload, never pick.
+     */
+    public function test_the_create_form_offers_media_from_every_design(): void
+    {
+        Asset::factory()->video()->forBase('luxury-wedding-v1')->create(['name' => 'Ring box opening']);
+        Asset::factory()->music()->forBase('luxury-wedding-v1')->create(['name' => 'Luxury score']);
+        Asset::factory()->video()->create(['name' => 'Shared clip']);
+
+        $this->get('/admin/templates/create')
+            ->assertOk()
+            ->assertSee('Ring box opening')
+            ->assertSee('Luxury score')
+            ->assertSee('Shared clip');
+    }
+
+    /** An inactive asset is not offered, whichever design it belongs to. */
+    public function test_the_create_form_hides_inactive_media(): void
+    {
+        Asset::factory()->video()->inactive()->create(['name' => 'Retired clip']);
+
+        $this->get('/admin/templates/create')->assertDontSee('Retired clip');
+    }
 
     public function test_a_base_template_with_no_directory_is_rejected(): void
     {

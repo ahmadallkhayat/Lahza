@@ -148,7 +148,10 @@
                         <option value="">{{ $template->intro_video ? 'Keep the current video' : 'Choose from the library…' }}</option>
                         @foreach ($videoAssets as $asset)
                             <option value="{{ $asset->id }}">
-                                {{ $asset->name }}{{ $asset->base_template ? '' : ' (shared)' }}
+                                {{-- Naming the design matters on create, where the
+                                     list spans all of them because none has been
+                                     chosen yet. --}}
+                                {{ $asset->name }} — {{ $asset->base_template ? $asset->baseTemplateLabel() : 'shared' }}
                             </option>
                         @endforeach
                     </x-ui.select>
@@ -201,7 +204,10 @@
                         <option value="">{{ $template->music ? 'Keep the current track' : 'Choose from the library…' }}</option>
                         @foreach ($musicAssets as $asset)
                             <option value="{{ $asset->id }}">
-                                {{ $asset->name }}{{ $asset->base_template ? '' : ' (shared)' }}
+                                {{-- Naming the design matters on create, where the
+                                     list spans all of them because none has been
+                                     chosen yet. --}}
+                                {{ $asset->name }} — {{ $asset->base_template ? $asset->baseTemplateLabel() : 'shared' }}
                             </option>
                         @endforeach
                     </x-ui.select>
