@@ -2,6 +2,7 @@
 const CONFIG = @json($s);
 const TARGET = new Date('{{ $invitation->startsAtIso() }}').getTime();
 const ARABIC_NUMERALS = @json(config("templates.locales.{$locale}.numerals") === 'arab');
+const IS_BOOMERANG = @json($template->boomerang_intro);
 
 const curtain  = document.getElementById('curtain');
 const intro    = document.getElementById('intro');
@@ -398,7 +399,7 @@ function startAmbient() {
  */
 function armSequence() {
     if (!intro) return;
-    const d = intro.duration;
+    let d = intro.duration;
     if (!isFinite(d) || d <= 0) {
         // Duration unknown, so lead times mean nothing. Show the names now
         // rather than leave the clip playing over an empty page.
@@ -406,6 +407,9 @@ function armSequence() {
 
         return;
     }
+
+    // For boomerang videos (forward + reverse), use half the duration for timing
+    if (IS_BOOMERANG) d = d / 2;
 
     marks = cues(d);
 
@@ -462,8 +466,10 @@ function cues(d) {
 if (intro) {
     intro.addEventListener('loadedmetadata', () => { if (opened) armSequence(); });
     intro.addEventListener('timeupdate', () => {
-        const d = intro.duration;
+        let d = intro.duration;
         if (!isFinite(d)) return;
+        // For boomerang videos (forward + reverse), use half the duration for timing
+        if (IS_BOOMERANG) d = d / 2;
         // The same marks the timers use, so a stall cannot fire a beat at a
         // moment the schedule would not have.
         const at = marks ?? cues(d);
