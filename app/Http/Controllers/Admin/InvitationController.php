@@ -69,9 +69,13 @@ class InvitationController extends Controller
 
         $invitation->update($data);
 
-        // Redrawn only when something the card shows has changed. It is an
-        // ffmpeg call, not worth spending to correct a phone number.
-        if ($invitation->wasChanged(['groom_ar', 'bride_ar', 'starts_at', 'template_id', 'slug'])) {
+        // Redrawn when something the card shows has changed, or when there is
+        // no card yet — the latter means a past attempt failed (a server that
+        // had never fetched its render face, say) and this save is the retry.
+        // Without it, an invitation whose first draw failed would carry no
+        // preview forever, since nothing else asks it to try again.
+        if ($invitation->wasChanged(['groom_ar', 'bride_ar', 'starts_at', 'template_id', 'slug'])
+            || $invitation->og_image === null) {
             $card = app(OgImageGenerator::class);
             $previous = $invitation->getOriginal('og_image');
             $generated = $card->generate($invitation);

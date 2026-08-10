@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Invitation;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -118,7 +119,9 @@ class OgImageGenerator
         // card came out as a row of hollow boxes with the tashkeel floating
         // around them. Amiri shapes correctly in the same command, and it is
         // already this design's serif, so the card stays in the family.
-        if ($this->face('Amiri') === null) {
+        $face = $this->face('Amiri');
+
+        if ($face === null) {
             return null;
         }
 
@@ -128,7 +131,6 @@ class OgImageGenerator
         $soft = $this->hex($palette['ink_soft'] ?? '#6b5648');
         $rule = $this->hex($palette['gold'] ?? '#a8874f');
 
-        $face = $this->face('Amiri');
         $date = $invitation->formattedDate();
 
         // Sized to fit before anything is drawn, since drawtext will happily
@@ -245,12 +247,81 @@ class OgImageGenerator
         return preg_replace('/[\u{064B}-\u{0652}]/u', '', $text) ?? $text;
     }
 
-    /** Absolute path of a downloaded render face, or null if absent. */
+    /**
+     * Absolute path of the render face, downloading it first if this server
+     * has never had one.
+     *
+     * `fonts:fetch` normally does this ahead of time, but nothing in the
+     * deploy pipeline ever runs it — it is a step someone has to remember to
+     * SSH in and do by hand. Forget it once (or rebuild the box, or lose
+     * `shared/storage`) and every card fails forever with nothing louder than
+     * a log line, because generate() catches exactly this and turns it into a
+     * quiet null. Fetching here means the card never depends on that manual
+     * step existing: the first invitation saved on a bare server pays the
+     * one-off download, storage/ is persisted across deploys, and every save
+     * after that reads the cached file.
+     */
     private function face(string $family): ?string
     {
-        $path = storage_path('app/fonts/'.(self::FACES[$family] ?? ''));
+        $filename = self::FACES[$family] ?? null;
 
-        return File::exists($path) ? $path : null;
+        if ($filename === null) {
+            return null;
+        }
+
+        $path = storage_path('app/fonts/'.$filename);
+
+        if (File::exists($path)) {
+            return $path;
+        }
+
+        return $this->downloadFace($family, $path) ? $path : null;
+    }
+
+    /**
+     * Fetch a whole TTF straight from Google Fonts.
+     *
+     * Google serves woff2 to a modern user agent and TTF to one it believes
+     * cannot handle that — ffmpeg needs the latter, hence the old Mozilla/4.0
+     * string, same trick `fonts:fetch` uses.
+     */
+    private function downloadFace(string $family, string $target): bool
+    {
+        try {
+            $url = 'https://fonts.googleapis.com/css2?family='
+                .str_replace('%20', '+', rawurlencode($family)).':wght@400;700';
+
+            $css = Http::timeout(15)->withHeaders(['User-Agent' => 'Mozilla/4.0'])->get($url);
+
+            if (! $css->successful()) {
+                return false;
+            }
+
+            preg_match_all('#https://fonts\.gstatic\.com/[^)\'"]+\.ttf#', $css->body(), $found);
+            $ttf = $found[0][0] ?? null;
+
+            if ($ttf === null) {
+                return false;
+            }
+
+            $file = Http::timeout(15)->withHeaders(['User-Agent' => 'Mozilla/4.0'])->get($ttf);
+
+            if (! $file->successful()) {
+                return false;
+            }
+
+            File::ensureDirectoryExists(dirname($target));
+            File::put($target, $file->body());
+
+            return true;
+        } catch (Throwable $e) {
+            Log::warning('Could not download the render face.', [
+                'family' => $family,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     /** Where the render faces and the scratch text files live. */
