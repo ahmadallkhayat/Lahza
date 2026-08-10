@@ -126,7 +126,22 @@ class CardEngine
         $dir = $this->resolveWorkDir();
 
         if ($dir === null) {
-            // Already logged by workDir() with the exact reason.
+            // Already logged by resolveWorkDir() with the exact reason.
+            return null;
+        }
+
+        $target = Storage::disk('public')->path($outputRelativePath);
+        Storage::disk('public')->makeDirectory(dirname($outputRelativePath));
+
+        // Checked before any of the work below, not just before ffmpeg runs:
+        // no point resolving fonts or writing scratch files for a render
+        // that cannot be saved. This directory is not one this process
+        // necessarily created — an older release, a different code path, or
+        // a server pre-populated by hand could all have put it there first —
+        // so ensureWritable() logs plainly when it turns out to be a
+        // directory this process does not own and chmod cannot fix, same as
+        // the working directory above.
+        if (! $this->ensureWritable(dirname($target), 'The card output directory')) {
             return null;
         }
 
@@ -150,9 +165,6 @@ class CardEngine
             $scratchPaths[] = $path;
             $textFiles[$name] = basename($path);
         }
-
-        $target = Storage::disk('public')->path($outputRelativePath);
-        Storage::disk('public')->makeDirectory(dirname($outputRelativePath));
 
         try {
             // Run from the working directory and refer to everything by bare
@@ -334,28 +346,16 @@ class CardEngine
      *
      * storage/app/fonts was the original home for this, and on the live
      * server it turned out to be owned by root with a POSIX ACL mask that
-     * silently capped php-fpm's own `rwx` grant down to read-only. Chmod
-     * could never fix that from here: only a file's owner or root may change
-     * its permissions or its ACL, and the web server was neither for a
-     * directory it did not create.
+     * silently capped php-fpm's own `rwx` grant down to read-only — not
+     * fixable from here, since only an owner or root may change a
+     * directory's permissions or ACL, and the web server was neither for one
+     * it did not create.
      *
      * So this creates its own: storage/app/private is Laravel's own local
      * disk root, and a fresh subdirectory under it is made by this very
-     * process, which makes php-fpm the owner from the moment it exists —
-     * unlike the old one, there is no inherited ownership to get wrong.
-     *
-     * That alone was not quite enough. The live server showed that Laravel's
-     * own ensureDirectoryExists(..., 0755) leaves *this* directory's ACL mask
-     * at r-x too, reproducibly, regardless of who runs it — the parent's
-     * default ACL grants rwx but the requested mode does not carry it
-     * through. The difference from the old directory is that this process
-     * now owns the one it just created, so — unlike last time — chmod is
-     * actually allowed to correct that, and does, before this gives up.
-     *
-     * A write is attempted and reversed on every call rather than trusting
-     * is_writable(), which reasons from permission bits and can be wrong
-     * about exactly this kind of ACL nuance. Actually writing is the only
-     * test that cannot lie.
+     * process, which makes php-fpm the owner from the moment it exists.
+     * Ownership is what lets ensureWritable() below actually correct the
+     * same ACL-mask quirk when it shows up again here, which it does.
      *
      * Public so a caller that needs this same directory ahead of render() —
      * OgImageGenerator sizes text with a font before it knows the final
@@ -377,37 +377,51 @@ class CardEngine
             return null;
         }
 
+        return $this->ensureWritable($dir, 'The card working directory') ? $dir : null;
+    }
+
+    /**
+     * Whether $dir can actually be written to, correcting it once if not.
+     *
+     * Found on the live server: Laravel's own mkdir(..., 0755) leaves a
+     * freshly created directory's ACL mask at r-x even though its parent's
+     * default ACL grants rwx — reproduced identically whether php-fpm or
+     * another process created it. What decides whether that is fixable from
+     * here is ownership, not who is asking: chmod only succeeds for a
+     * directory this process actually owns, which is true of one it created
+     * itself (the working directory) but not necessarily one an older
+     * release or a different code path created first (the output directory,
+     * on the server this was written for). Retried once after chmod, since
+     * that is the only thing an attempt changes.
+     *
+     * A write is attempted and reversed rather than trusting is_writable(),
+     * which reasons from permission bits and can be wrong about exactly this
+     * kind of ACL nuance. Actually writing is the only test that cannot lie.
+     */
+    private function ensureWritable(string $dir, string $logLabel): bool
+    {
         if ($this->probeWritable($dir)) {
-            return $dir;
+            return true;
         }
 
-        // Found on the live server: Laravel's own mkdir(..., 0755) leaves
-        // this exact directory's ACL mask at r-x even though its parent's
-        // default ACL grants rwx — reproduced identically whether php-fpm or
-        // this process created it. Unlike the old storage/app/fonts
-        // location, this directory is one this process (or an earlier run of
-        // it) created itself, so — unlike that one — it is actually the
-        // owner here and chmod is allowed to succeed. Retried once after,
-        // since that is the only thing this attempt changed.
         @chmod($dir, 0775);
 
         if ($this->probeWritable($dir)) {
-            return $dir;
+            return true;
         }
 
-        // Still not writable after owning it and asking nicely: this is not
-        // the ACL-inheritance quirk above, since that always yields to
-        // chmod. Something else is wrong — wrong owner despite this process
-        // having created it (a leftover from before this code existed, say),
-        // a full disk, a read-only mount — and it needs a person, not
-        // another retry.
-        Log::warning('The card working directory exists but is not writable.', [
+        // Still not writable after asking nicely: either this process does
+        // not own $dir (chmod always yields to ownership, so this is the
+        // usual reason), or something chmod cannot touch at all — a full
+        // disk, a read-only mount. Either way it needs a person, not another
+        // retry, and the two uids below say which case this is.
+        Log::warning("{$logLabel} exists but is not writable.", [
             'dir' => $dir,
             'owner_uid' => fileowner($dir),
             'process_uid' => function_exists('posix_geteuid') ? posix_geteuid() : null,
         ]);
 
-        return null;
+        return false;
     }
 
     /** Whether $dir can actually be written to right now — the only test that cannot lie about it. */
