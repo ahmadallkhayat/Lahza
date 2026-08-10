@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Http;
+
 /**
  * Add diacritics (tashkeel/harakat) to Arabic text.
  *
@@ -11,6 +13,7 @@ namespace App\Services;
 class ArabicDiacriticizer
 {
     private const API_URL = 'https://api.mishkal.ai/diacritize';
+
     private const TIMEOUT = 5;
 
     public function diacritize(string $text): ?string
@@ -20,7 +23,7 @@ class ArabicDiacriticizer
         }
 
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(self::TIMEOUT)
+            $response = Http::timeout(self::TIMEOUT)
                 ->post(self::API_URL, ['text' => $text]);
 
             if ($response->successful() && $response->has('diacritized')) {
