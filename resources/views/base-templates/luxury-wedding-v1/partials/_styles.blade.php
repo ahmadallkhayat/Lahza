@@ -245,11 +245,9 @@ body::before {
 }
 
 /* ─── CONTENT ────────────────────────────────────────────────── */
-/* No z-index here on purpose. `position: relative` alone creates no stacking
-   context, which is what lets the names inside blend against the clip two
-   layers down. Adding one would silently kill the effect. */
 main {
   position: relative;
+  z-index: 10;
   max-width: var(--shell);
   margin: 0 auto;
   padding: clamp(3rem, 9vh, 5.5rem) 1.6rem 4.5rem;
@@ -366,14 +364,14 @@ main.revealed > * {
 }
 
 /* ─── PETALS ─────────────────────────────────────────────────────
-   Above the invitation, below the curtain, and untouchable. They start with the
-   reveal and thin out after it: continuous fall is livelier for the first look,
-   but it never stops being motion in the corner of the eye, and someone reading
-   a programme should not be doing it in weather. */
+   Behind the content, above the clip. They start with the reveal and thin out
+   after it: continuous fall is livelier for the first look, but it never stops
+   being motion in the corner of the eye, and someone reading a programme should
+   not be doing it in weather. Untouchable via pointer-events. */
 #petals {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 5;
   overflow: hidden;
   pointer-events: none;
   opacity: 0;
