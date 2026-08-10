@@ -14,7 +14,7 @@
         <video
             id="intro"
             playsinline
-            preload="auto"
+            preload="metadata"
             muted
             @if ($template->boomerang_intro)
                 loop
