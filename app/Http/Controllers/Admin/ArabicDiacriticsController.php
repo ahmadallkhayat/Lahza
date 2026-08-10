@@ -21,7 +21,11 @@ class ArabicDiacriticsController extends Controller
 
         if ($diacritized === null) {
             return response()->json(
-                ['error' => 'Could not add vowels. The service may be unavailable. Try again or add them manually.'],
+                [
+                    'error' => 'Could not add vowels. The service may be temporarily unavailable. '.
+                               'Try again or add them manually.',
+                    'text' => $text,
+                ],
                 503
             );
         }
