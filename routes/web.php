@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AccountController;
+use App\Http\Controllers\Admin\ArabicDiacriticsController;
 use App\Http\Controllers\Admin\AssetController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\InvitationController as AdminInvitationController;
@@ -83,6 +84,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('translate', TranslateController::class)
             ->middleware('throttle:20,1')
             ->name('translate');
+
+        // Adds diacritics (vowel marks) to Arabic text. Throttled to prevent
+        // API abuse since it calls an external diacritization service.
+        Route::post('diacritize', [ArabicDiacriticsController::class, 'diacritize'])
+            ->middleware('throttle:30,1')
+            ->name('diacritize');
 
         // The signed-in account's own settings. No {user} segment by design —
         // there is one account, and it is always the authenticated one.

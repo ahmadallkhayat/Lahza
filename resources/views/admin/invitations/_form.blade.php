@@ -237,13 +237,51 @@
 </x-ui.card>
 
 <x-ui.card title="The couple" description="Names render in Arabic in every language.">
-    <div class="grid gap-5 sm:grid-cols-2">
+    <div class="grid gap-5 sm:grid-cols-2" x-data="{ groomLoading: false, brideLoading: false }">
         <x-ui.field label="Groom (Arabic)" name="groom_ar" required hint="Include tashkeel if you want it shown, e.g. يُوسُف">
-            <x-ui.input name="groom_ar" :value="old('groom_ar', $invitation->groom_ar)" dir="rtl" required />
+            <div class="flex gap-2">
+                <x-ui.input name="groom_ar" :value="old('groom_ar', $invitation->groom_ar)" dir="rtl" required />
+                <button
+                    type="button"
+                    @click="groomLoading = true; fetch('{{ route('admin.diacritize') }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content },
+                        body: JSON.stringify({ text: $el.previousElementSibling.value })
+                    }).then(r => r.json()).then(d => {
+                        if (d.text) $el.previousElementSibling.value = d.text;
+                        if (d.error) alert(d.error);
+                    }).finally(() => groomLoading = false)"
+                    :disabled="groomLoading"
+                    class="shrink-0 rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60 transition-colors"
+                    title="Add vowel marks (diacritics) to the name"
+                >
+                    <span x-show="!groomLoading">Add vowels</span>
+                    <span x-show="groomLoading">Adding...</span>
+                </button>
+            </div>
         </x-ui.field>
 
         <x-ui.field label="Bride (Arabic)" name="bride_ar" required>
-            <x-ui.input name="bride_ar" :value="old('bride_ar', $invitation->bride_ar)" dir="rtl" required />
+            <div class="flex gap-2">
+                <x-ui.input name="bride_ar" :value="old('bride_ar', $invitation->bride_ar)" dir="rtl" required />
+                <button
+                    type="button"
+                    @click="brideLoading = true; fetch('{{ route('admin.diacritize') }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name=csrf-token]')?.content },
+                        body: JSON.stringify({ text: $el.previousElementSibling.value })
+                    }).then(r => r.json()).then(d => {
+                        if (d.text) $el.previousElementSibling.value = d.text;
+                        if (d.error) alert(d.error);
+                    }).finally(() => brideLoading = false)"
+                    :disabled="brideLoading"
+                    class="shrink-0 rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 disabled:opacity-60 transition-colors"
+                    title="Add vowel marks (diacritics) to the name"
+                >
+                    <span x-show="!brideLoading">Add vowels</span>
+                    <span x-show="brideLoading">Adding...</span>
+                </button>
+            </div>
         </x-ui.field>
 
         <x-ui.field label="Groom (Latin)" name="groom_latin" hint="Shown small beneath the Arabic on the English link only.">
