@@ -270,10 +270,17 @@ class OgImageGenerator
         return $groom.' و '.$bride;
     }
 
-    /** Remove combining diacritical marks (U+064B to U+0652). */
+    /**
+     * Remove combining diacritical marks (U+064B to U+0652).
+     *
+     * `\x{...}`, not `\u{...}` — the latter is a PHP *string* escape and
+     * means nothing to PCRE, which read it as the literal two characters
+     * `\u` followed by a brace group and refused to compile the pattern.
+     * Every single card failed on this until the log actually said why.
+     */
     private function stripDiacritics(string $text): string
     {
-        return preg_replace('/[\u{064B}-\u{0652}]/u', '', $text) ?? $text;
+        return preg_replace('/[\x{064B}-\x{0652}]/u', '', $text) ?? $text;
     }
 
     /**
@@ -298,7 +305,7 @@ class OgImageGenerator
             return null;
         }
 
-        $path = storage_path('app/fonts/'.$filename);
+        $path = $this->faceDir().DIRECTORY_SEPARATOR.$filename;
 
         if (File::exists($path)) {
             return $path;
@@ -353,10 +360,33 @@ class OgImageGenerator
         }
     }
 
-    /** Where the render faces and the scratch text files live. */
+    /**
+     * Where the render faces and the scratch text files live, guaranteed
+     * writable by whoever PHP is running as.
+     *
+     * Found on the live server: this directory existed with a POSIX ACL
+     * whose *mask* entry was r-x, silently capping the explicit `www-data:
+     * rwx` entry down to read-only — php-fpm could read the font it needed
+     * but not write the scratch file beside it, and every card failed with
+     * "Permission denied" until the exit-code logging above caught it.
+     *
+     * chmod sets the ACL mask directly (POSIX: the group bits of a chmod
+     * on an object that already has an ACL become its mask), so calling it
+     * unconditionally here repairs that class of drift — including on a
+     * freshly created directory whose mask ends up wrong for the same
+     * reason — without anyone having to notice or SSH in.
+     */
     private function faceDir(): string
     {
-        return storage_path('app/fonts');
+        $dir = storage_path('app/fonts');
+
+        File::ensureDirectoryExists($dir);
+
+        if (! File::isWritable($dir)) {
+            @chmod($dir, 0775);
+        }
+
+        return $dir;
     }
 
     /**
