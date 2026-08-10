@@ -27,6 +27,11 @@
         ? route('invitations.calendar', $invitation)
         : route('invitations.calendar.locale', [$invitation, $locale]);
 
+    // Boomerang video if enabled, otherwise the regular intro
+    $introVideo = $template->boomerang_intro && filled($template->boomerang_intro_path)
+        ? $template->boomerang_intro_path
+        : $template->intro_video;
+
     // Names and the verse are Arabic in every locale, so Aref Ruqaa and Amiri
     // always load. Kurdish must not use Cairo — Cairo has no glyphs for
     // ڕ ڵ ۆ ە ێ, and a fallback face supplying only those five letters breaks

@@ -233,6 +233,17 @@
                 @endif
             </p>
         </x-ui.field>
+
+        <label class="flex items-center gap-2 text-sm text-ink-700">
+            <input
+                type="checkbox"
+                name="boomerang_intro"
+                value="1"
+                @checked(old('boomerang_intro', $template->boomerang_intro))
+                class="rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+            >
+            Boomerang intro — plays forward then reverses, seamlessly looped
+        </label>
     </div>
 </x-ui.card>
 

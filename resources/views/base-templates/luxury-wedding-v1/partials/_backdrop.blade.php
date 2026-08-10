@@ -10,13 +10,16 @@
      And it outlives the intro: once the reveal is done the same element keeps
      running, reversed and blurred, as the surface the glass panels refract. --}}
 <div id="backdrop" aria-hidden="true">
-    @if ($template->intro_video)
+    @if ($introVideo)
         <video
             id="intro"
             playsinline
             preload="auto"
             muted
-            src="{{ $template->intro_video }}"
+            @if ($template->boomerang_intro)
+                loop
+            @endif
+            src="{{ $introVideo }}"
         ></video>
     @endif
 

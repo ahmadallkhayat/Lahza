@@ -61,6 +61,8 @@ class Template extends Model
         'intro_video',
         'ambient_video',
         'music',
+        'boomerang_intro',
+        'boomerang_intro_path',
         'palette',
         'settings',
         'is_active',
@@ -70,6 +72,7 @@ class Template extends Model
         'palette' => 'array',
         'settings' => 'array',
         'is_active' => 'boolean',
+        'boomerang_intro' => 'boolean',
     ];
 
     public function invitations(): HasMany

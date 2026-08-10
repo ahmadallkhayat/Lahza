@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\TemplateRequest;
 use App\Models\Asset;
 use App\Models\Template;
 use App\Services\AmbientVideoEncoder;
+use App\Services\BoomerangVideoEncoder;
 use App\Services\VideoPaletteExtractor;
 use App\Support\BaseTemplates;
 use App\Support\MediaStore;
@@ -51,6 +52,11 @@ class TemplateController extends Controller
         $note = $this->maybeDerivePalette($request, $data, $data['intro_video']);
         $data['ambient_video'] = $this->ambient($data['intro_video']);
 
+        if ($request->boolean('boomerang_intro')) {
+            $data['boomerang_intro'] = true;
+            $data['boomerang_intro_path'] = $this->boomerang($data['intro_video']);
+        }
+
         $template = Template::create($data);
 
         return to_route('admin.templates.edit', $template)
@@ -87,6 +93,25 @@ class TemplateController extends Controller
         if ($videoUrl !== $template->intro_video) {
             app(AmbientVideoEncoder::class)->forget($template->ambient_video);
             $data['ambient_video'] = $this->ambient($videoUrl);
+
+            app(BoomerangVideoEncoder::class)->forget($template->boomerang_intro_path);
+            if ($request->boolean('boomerang_intro')) {
+                $data['boomerang_intro'] = true;
+                $data['boomerang_intro_path'] = $this->boomerang($videoUrl);
+            } else {
+                $data['boomerang_intro'] = false;
+                $data['boomerang_intro_path'] = null;
+            }
+        } elseif ($request->boolean('boomerang_intro') !== $template->boomerang_intro) {
+            // Boomerang toggle changed but video didn't
+            if ($request->boolean('boomerang_intro')) {
+                $data['boomerang_intro'] = true;
+                $data['boomerang_intro_path'] = $this->boomerang($videoUrl);
+            } else {
+                app(BoomerangVideoEncoder::class)->forget($template->boomerang_intro_path);
+                $data['boomerang_intro'] = false;
+                $data['boomerang_intro_path'] = null;
+            }
         }
 
         $template->update($data);
@@ -107,6 +132,7 @@ class TemplateController extends Controller
 
         $this->releaseMedia($template->intro_video);
         app(AmbientVideoEncoder::class)->forget($template->ambient_video);
+        app(BoomerangVideoEncoder::class)->forget($template->boomerang_intro_path);
         $this->releaseMedia($template->music);
 
         $template->delete();
@@ -280,6 +306,13 @@ class TemplateController extends Controller
     {
         return filled($videoUrl)
             ? app(AmbientVideoEncoder::class)->encode($videoUrl)
+            : null;
+    }
+
+    private function boomerang(?string $videoUrl): ?string
+    {
+        return filled($videoUrl)
+            ? app(BoomerangVideoEncoder::class)->encode($videoUrl)
             : null;
     }
 
