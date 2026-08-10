@@ -46,7 +46,7 @@ class InvitationController extends Controller
 
         $invitation = Invitation::create($data);
 
-        $invitation->update(['og_image' => app(OgImageGenerator::class)->generate($invitation)]);
+        $this->syncCard($invitation, forceRedraw: true);
 
         return to_route('admin.invitations.edit', $invitation)
             ->with('status', 'Invitation created.');
@@ -69,27 +69,46 @@ class InvitationController extends Controller
 
         $invitation->update($data);
 
-        // Redrawn when something the card shows has changed, or when there is
-        // no card yet — the latter means a past attempt failed (a server that
-        // had never fetched its render face, say) and this save is the retry.
-        // Without it, an invitation whose first draw failed would carry no
-        // preview forever, since nothing else asks it to try again.
-        if ($invitation->wasChanged(['groom_ar', 'bride_ar', 'starts_at', 'template_id', 'slug'])
-            || $invitation->og_image === null) {
-            $card = app(OgImageGenerator::class);
-            $previous = $invitation->getOriginal('og_image');
-            $generated = $card->generate($invitation);
-
-            // Only update if generation succeeded. Keeps the previous image if
-            // rendering fails (e.g. due to unusual characters) rather than
-            // leaving the link preview blank.
-            if ($generated !== null) {
-                $invitation->update(['og_image' => $generated]);
-                $card->forget($previous);
-            }
-        }
+        $this->syncCard($invitation, forceRedraw: $invitation->wasChanged([
+            'groom_ar', 'bride_ar', 'starts_at', 'template_id', 'slug',
+        ]));
 
         return back()->with('status', 'Invitation updated.');
+    }
+
+    /**
+     * Make sure this invitation's link-preview card is actually there,
+     * redrawing it if it needs to be.
+     *
+     * Runs on every save, not just ones that touched a field the card shows.
+     * A card is drawn once and then trusted forever by everything else in
+     * the app — the column holds a URL and nobody re-checks it — so this is
+     * the one place a stale or missing file gets caught: gone from disk
+     * (storage wiped, deleted by hand), never drawn in the first place (an
+     * old save that failed before the renderer could self-heal), or simply
+     * out of date because $forceRedraw says the content moved on since.
+     *
+     * Silent either way: a card is decorative, and failing to draw one a
+     * second time is exactly as unsurprising as failing to draw it the
+     * first — generate() has already logged why.
+     */
+    private function syncCard(Invitation $invitation, bool $forceRedraw): void
+    {
+        $card = app(OgImageGenerator::class);
+
+        if (! $forceRedraw && $card->exists($invitation->og_image)) {
+            return;
+        }
+
+        $previous = $invitation->og_image;
+        $generated = $card->generate($invitation);
+
+        if ($generated === null) {
+            return;
+        }
+
+        $invitation->update(['og_image' => $generated]);
+        $card->forget($previous);
     }
 
     public function destroy(Invitation $invitation): RedirectResponse

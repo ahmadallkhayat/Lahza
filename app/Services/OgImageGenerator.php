@@ -197,6 +197,16 @@ class OgImageGenerator
         }
 
         if (! $result->successful() || ! Storage::disk('public')->exists($relative)) {
+            // The only failure in draw() that generate()'s catch cannot see —
+            // a non-zero exit is not an exception, ffmpeg reports it on
+            // stderr instead. Logged here or it vanishes the same way a
+            // missing render face used to.
+            Log::warning('ffmpeg could not draw the invitation card.', [
+                'invitation' => $invitation->slug,
+                'exit_code' => $result->exitCode(),
+                'stderr' => Str::limit($result->errorOutput(), 2000),
+            ]);
+
             Storage::disk('public')->delete($relative);
 
             return null;
@@ -213,6 +223,25 @@ class OgImageGenerator
         }
 
         Storage::disk('public')->delete(ltrim(Str::after($url, '/storage/'), '/'));
+    }
+
+    /**
+     * Whether a stored og_image points at a file that is actually still
+     * there.
+     *
+     * The column and the disk can drift apart — a release that lost
+     * shared/storage, a file deleted by hand, disk cleanup elsewhere — and
+     * nothing else ever notices, since Eloquent has no idea the URL it is
+     * holding no longer resolves to anything. This is what lets a save
+     * re-check that rather than trusting the column.
+     */
+    public function exists(?string $url): bool
+    {
+        if (blank($url) || ! str_contains($url, 'invitations/og/')) {
+            return false;
+        }
+
+        return Storage::disk('public')->exists(ltrim(Str::after($url, '/storage/'), '/'));
     }
 
     /**
