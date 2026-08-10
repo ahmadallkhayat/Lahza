@@ -50,11 +50,13 @@ class TemplateController extends Controller
             ?? $this->selectedAsset($request, 'music_asset')?->path;
 
         $note = $this->maybeDerivePalette($request, $data, $data['intro_video']);
-        $data['ambient_video'] = $this->ambient($data['intro_video']);
 
         if ($request->boolean('boomerang_intro')) {
             $data['boomerang_intro'] = true;
             $data['boomerang_intro_path'] = $this->boomerang($data['intro_video']);
+            $data['ambient_video'] = null;
+        } else {
+            $data['ambient_video'] = $this->ambient($data['intro_video']);
         }
 
         $template = Template::create($data);
@@ -92,25 +94,30 @@ class TemplateController extends Controller
         // spend a minute of ffmpeg to rename a template.
         if ($videoUrl !== $template->intro_video) {
             app(AmbientVideoEncoder::class)->forget($template->ambient_video);
-            $data['ambient_video'] = $this->ambient($videoUrl);
-
             app(BoomerangVideoEncoder::class)->forget($template->boomerang_intro_path);
+
             if ($request->boolean('boomerang_intro')) {
                 $data['boomerang_intro'] = true;
                 $data['boomerang_intro_path'] = $this->boomerang($videoUrl);
+                $data['ambient_video'] = null;
             } else {
                 $data['boomerang_intro'] = false;
                 $data['boomerang_intro_path'] = null;
+                $data['ambient_video'] = $this->ambient($videoUrl);
             }
         } elseif ($request->boolean('boomerang_intro') !== $template->boomerang_intro) {
             // Boomerang toggle changed but video didn't
             if ($request->boolean('boomerang_intro')) {
+                app(BoomerangVideoEncoder::class)->forget($template->boomerang_intro_path);
                 $data['boomerang_intro'] = true;
                 $data['boomerang_intro_path'] = $this->boomerang($videoUrl);
+                app(AmbientVideoEncoder::class)->forget($template->ambient_video);
+                $data['ambient_video'] = null;
             } else {
                 app(BoomerangVideoEncoder::class)->forget($template->boomerang_intro_path);
                 $data['boomerang_intro'] = false;
                 $data['boomerang_intro_path'] = null;
+                $data['ambient_video'] = $this->ambient($videoUrl);
             }
         }
 

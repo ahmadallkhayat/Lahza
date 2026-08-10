@@ -344,6 +344,9 @@ function startPetals() {
    Reversed because forward playback loops with a visible jump back to the first
    frame; reversed footage of a slow motion reads as continuous drift. */
 function startAmbient() {
+    // Boomerang video loops on its own, no ambient needed
+    if (IS_BOOMERANG) return;
+
     // Motion is the entire point of this layer, so honouring the preference
     // means not running it at all rather than running it faster.
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
