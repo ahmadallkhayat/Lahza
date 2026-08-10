@@ -290,22 +290,11 @@ main.names-in:not(.revealed) .couple {
 }
 
 /* ── Names over the clip ─────────────────────────────────────────
-   While the video is still running the names read as the inverse of whatever
-   is behind them: white on a dark frame, black on a bright one, changing as
-   the footage does. `difference` against white gives exactly that, per pixel
-   and per frame, with no sampling and nothing to keep in sync.
-
-   This is why the clip sits at the bottom of the root stacking context and
-   why `main` carries no z-index — blending only reaches what is painted below
-   it in the same context.
-
-   The gold ampersand is exempt: inverting it turns it a muddy cyan. It holds
-   its own colour and simply fades in with the rest. */
+   White text over the video. The gold ampersand is drawn on top. */
 main.blending .couple {
   color: #fff;
-  mix-blend-mode: difference;
 }
-main.blending .couple .amp { mix-blend-mode: normal; }
+main.blending .couple .amp { color: var(--gold); }
 
 /* Where blending is unavailable the names just use their own colour. Worth
    stating rather than leaving to chance: the fallback for `difference` is no
