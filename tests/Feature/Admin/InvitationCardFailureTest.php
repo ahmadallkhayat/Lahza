@@ -71,8 +71,12 @@ class InvitationCardFailureTest extends TestCase
      */
     public function test_the_real_renderer_catches_and_logs_instead_of_throwing(): void
     {
+        // The legacy location CardEngine still reads a cached face from, so
+        // this covers the same ground the FACES constant used to: a face has
+        // to be resolvable or generate() bails before reaching anything that
+        // can fail, which would make this test pass for the wrong reason.
         File::ensureDirectoryExists(storage_path('app/fonts'));
-        File::put(storage_path('app/fonts/'.OgImageGenerator::FACES['Amiri']), 'not really a font');
+        File::put(storage_path('app/fonts/amiri.ttf'), 'not really a font');
 
         Process::fake(fn () => throw new RuntimeException('ffmpeg is not installed'));
         Log::spy();
@@ -83,14 +87,18 @@ class InvitationCardFailureTest extends TestCase
 
         $this->assertNull($result);
 
+        // Twice, not once: generate() retries once on a failure like this
+        // (a real ffmpeg crash could easily be transient), and logs each
+        // attempt it makes rather than only the last.
         Log::shouldHaveReceived('warning')
             ->withArgs(fn (string $message) => str_contains($message, 'could not be drawn'))
-            ->once();
+            ->twice();
     }
 
     protected function tearDown(): void
     {
-        File::delete(storage_path('app/fonts/'.OgImageGenerator::FACES['Amiri']));
+        File::delete(storage_path('app/fonts/amiri.ttf'));
+        File::deleteDirectory(storage_path('app/private/cards'));
 
         parent::tearDown();
     }
