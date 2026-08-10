@@ -226,11 +226,23 @@ class OgImageGenerator
         $groom = trim((string) $invitation->groom_ar);
         $bride = trim((string) $invitation->bride_ar);
 
+        // Strip combining diacritical marks (harakat/tashkeel) if present.
+        // They can cause rendering issues in ffmpeg. The invitation page shows
+        // them; the og:image is just for the preview card.
+        $groom = $this->stripDiacritics($groom);
+        $bride = $this->stripDiacritics($bride);
+
         if ($groom === '' || $bride === '') {
             return trim($groom.$bride);
         }
 
         return $groom.' و '.$bride;
+    }
+
+    /** Remove combining diacritical marks (U+064B to U+0652). */
+    private function stripDiacritics(string $text): string
+    {
+        return preg_replace('/[\u{064B}-\u{0652}]/u', '', $text) ?? $text;
     }
 
     /** Absolute path of a downloaded render face, or null if absent. */

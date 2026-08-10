@@ -74,9 +74,15 @@ class InvitationController extends Controller
         if ($invitation->wasChanged(['groom_ar', 'bride_ar', 'starts_at', 'template_id', 'slug'])) {
             $card = app(OgImageGenerator::class);
             $previous = $invitation->getOriginal('og_image');
+            $generated = $card->generate($invitation);
 
-            $invitation->update(['og_image' => $card->generate($invitation)]);
-            $card->forget($previous);
+            // Only update if generation succeeded. Keeps the previous image if
+            // rendering fails (e.g. due to unusual characters) rather than
+            // leaving the link preview blank.
+            if ($generated !== null) {
+                $invitation->update(['og_image' => $generated]);
+                $card->forget($previous);
+            }
         }
 
         return back()->with('status', 'Invitation updated.');
