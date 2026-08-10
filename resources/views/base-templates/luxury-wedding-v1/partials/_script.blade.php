@@ -212,8 +212,43 @@ curtain.addEventListener('click', () => {
     // until the reveal so nothing below it can be touched yet.
     curtain.classList.add('opened');
 
+    /* Music waits for the clip to actually be on screen, not for play() to
+       have been called.
+
+       play()'s own promise resolves once the browser has granted playback,
+       which is not the same moment as the first frame painting — on a cold
+       decoder, a slow connection, or just an unlucky device, there is a real
+       gap between the two. Starting music on the promise (or, before that,
+       on nothing at all) meant the guest sometimes heard the track begin
+       against a still-frozen curtain, because nothing here had actually
+       confirmed the video was moving yet.
+
+       'playing' is the event for that: it fires specifically when rendering
+       resumes after being paused or stalled for data, which is exactly what
+       "the clip is now visibly running" means. musicArmed guards against
+       double-starting if the fallback below ever fires alongside it. */
+    let musicArmed = false;
+
+    function beginMusic() {
+        if (musicArmed) return;
+        musicArmed = true;
+
+        if (CONFIG.keepVideoAudioMs > 0 && intro) {
+            setTimeout(() => { intro.muted = true; startMusic(); }, CONFIG.keepVideoAudioMs);
+        } else {
+            startMusic();
+        }
+    }
+
     if (intro) {
         intro.classList.add('playing');
+
+        // Never leave the guest in silence if 'playing' happens not to fire —
+        // a stall right after a successful play() is rare but not impossible,
+        // and total silence for the rest of the visit is worse than music
+        // starting a little late.
+        intro.addEventListener('playing', beginMusic, { once: true });
+        setTimeout(beginMusic, CONFIG.revealFallbackMs);
 
         /* Muted, and played synchronously inside the click.
 
@@ -242,20 +277,18 @@ curtain.addEventListener('click', () => {
             armSequence();
         }).catch(() => {
             // Even muted playback was refused, so there is no duration to hang
-            // the sequence off. The names still lead, just on a timer.
+            // the sequence off. The names still lead, just on a timer. Nothing
+            // is playing, so there is nothing for music to wait on.
             showNames();
             setTimeout(reveal, 900);
+            beginMusic();
         });
     } else {
-        // No clip: the names still lead, just on a timer rather than a duration.
+        // No clip: the names still lead, just on a timer rather than a
+        // duration, and music has nothing to sync to either.
         showNames();
         setTimeout(reveal, 900);
-    }
-
-    if (CONFIG.keepVideoAudioMs > 0 && intro) {
-        setTimeout(() => { intro.muted = true; startMusic(); }, CONFIG.keepVideoAudioMs);
-    } else {
-        startMusic();
+        beginMusic();
     }
 
     setTimeout(reveal, CONFIG.revealFallbackMs);
