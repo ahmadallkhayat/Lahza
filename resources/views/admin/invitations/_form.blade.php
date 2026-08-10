@@ -243,7 +243,7 @@
                 <x-ui.input name="groom_ar" :value="old('groom_ar', $invitation->groom_ar)" dir="rtl" required />
                 <button
                     type="button"
-                    @click="window.open('https://tashkeel.app/?text=' + encodeURIComponent($el.previousElementSibling.value), '_blank')"
+                    @click="window.open('https://www.i2text.com/diacritize-arabic-text', '_blank')"
                     class="shrink-0 rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 transition-colors"
                     title="Open online tool to add vowel marks"
                 >
@@ -257,7 +257,7 @@
                 <x-ui.input name="bride_ar" :value="old('bride_ar', $invitation->bride_ar)" dir="rtl" required />
                 <button
                     type="button"
-                    @click="window.open('https://tashkeel.app/?text=' + encodeURIComponent($el.previousElementSibling.value), '_blank')"
+                    @click="window.open('https://www.i2text.com/diacritize-arabic-text', '_blank')"
                     class="shrink-0 rounded-lg border border-ink-300 bg-white px-3 py-2 text-sm font-medium text-ink-700 hover:bg-ink-50 transition-colors"
                     title="Open online tool to add vowel marks"
                 >
