@@ -71,6 +71,48 @@ return [
      * a decimal; everything else is a whole number of milliseconds.
      */
     'settings' => [
+        /* ── The opening ──────────────────────────────────────────────
+           What a guest meets before they tap. The clip's own first frame
+           sits behind it, blurred and dimmed, so the wait already belongs
+           to this wedding rather than being a flat colour with a button on
+           it — and the tap opens the page the way the invitation itself
+           arrived. */
+        'opening' => [
+            'label' => 'Opening',
+            'hint' => 'How the page opens when the guest taps.',
+            'default' => 'envelope',
+            'options' => ['envelope', 'veil'],
+            'labels' => [
+                'envelope' => 'Envelope — the flap lifts and the page unfolds',
+                'veil' => 'Veil — the cover simply dissolves',
+            ],
+        ],
+
+        'openingMs' => [
+            'label' => 'Opening length',
+            'hint' => 'ms for the envelope to open. Ignored by the veil.',
+            'default' => 1500,
+            'min' => 300,
+            'max' => 6000,
+        ],
+
+        'veilBlurPx' => [
+            'label' => 'Landing blur',
+            'hint' => 'How soft the held first frame is before the tap.',
+            'default' => 26,
+            'min' => 0,
+            'max' => 80,
+        ],
+
+        'veilDim' => [
+            'label' => 'Landing brightness',
+            'hint' => '0–1. Lower holds the frame darker, so the prompt reads.',
+            'default' => 0.5,
+            'min' => 0.05,
+            'max' => 1,
+            'step' => 0.01,
+        ],
+
         'keepVideoAudioMs' => [
             'label' => 'Keep video audio',
             'hint' => 'ms before muting the clip. 0 keeps it silent throughout.',

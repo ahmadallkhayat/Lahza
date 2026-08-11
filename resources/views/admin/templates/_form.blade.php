@@ -283,15 +283,28 @@
                     :for="'settings_'.$key"
                     :hint="$field['hint'] ?? null"
                 >
-                    <x-ui.input
-                        type="number"
-                        :name="'settings['.$key.']'"
-                        :id="'settings_'.$key"
-                        :value="$settings[$key] ?? $field['default']"
-                        :step="$field['step'] ?? 1"
-                        :min="$field['min'] ?? null"
-                        :max="$field['max'] ?? null"
-                    />
+                    @if (isset($field['options']))
+                        {{-- A named choice rather than a number: the design
+                             offers a fixed set and has a rule for each. --}}
+                        <x-ui.select :name="'settings['.$key.']'" :id="'settings_'.$key">
+                            @foreach ($field['options'] as $option)
+                                <option
+                                    value="{{ $option }}"
+                                    @selected(($settings[$key] ?? $field['default']) === $option)
+                                >{{ $field['labels'][$option] ?? Str::headline($option) }}</option>
+                            @endforeach
+                        </x-ui.select>
+                    @else
+                        <x-ui.input
+                            type="number"
+                            :name="'settings['.$key.']'"
+                            :id="'settings_'.$key"
+                            :value="$settings[$key] ?? $field['default']"
+                            :step="$field['step'] ?? 1"
+                            :min="$field['min'] ?? null"
+                            :max="$field['max'] ?? null"
+                        />
+                    @endif
                 </x-ui.field>
             @endforeach
         </div>

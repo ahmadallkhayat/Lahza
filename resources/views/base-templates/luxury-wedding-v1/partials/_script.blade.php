@@ -184,15 +184,38 @@ function armPrompt() {
     promptEl.classList.add('ready');
 }
 
+/* ── the held first frame ───────────────────────────────────────────
+   Show the clip's own opening frame, blurred, as what the guest waits on.
+
+   Tied to readyState rather than to the prompt, because the two answer
+   different questions: armPrompt also fires on error and on the loader
+   timeout, and veiling then would hold up an empty black rectangle where
+   the curtain's own colour belongs. HAVE_CURRENT_DATA is the level that
+   means there is a frame decoded to show — anything less and this would
+   be asking the compositor to blur nothing. */
+let veiled = false;
+
+function veil() {
+    if (veiled || !intro) return;
+    veiled = true;
+
+    intro.classList.add('veiled');
+}
+
 if (!intro) {
     // No clip to wait for.
     armPrompt();
 } else if (intro.readyState >= 3) {
     // Already buffered — a cached clip is ready before this script runs.
+    veil();
     armPrompt();
 } else {
     intro.addEventListener('canplay', armPrompt, { once: true });
     intro.addEventListener('loadeddata', armPrompt, { once: true });
+
+    // The first frame usually lands well before the clip can play through,
+    // so the wait is spent looking at the wedding rather than at a colour.
+    intro.addEventListener('loadeddata', veil, { once: true });
 
     // Never leave someone looking at the mark. If the clip cannot be reached
     // the tap still has to work; the sequence already handles a failed play().
@@ -241,6 +264,10 @@ curtain.addEventListener('click', () => {
     }
 
     if (intro) {
+        // Off with the blur as the envelope opens: .playing carries no filter,
+        // so the held frame resolves into the moving clip over the same
+        // --open that the flap folds through. One gesture, not two.
+        intro.classList.remove('veiled');
         intro.classList.add('playing');
 
         // Never leave the guest in silence if 'playing' happens not to fire —

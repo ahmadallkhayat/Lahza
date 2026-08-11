@@ -84,6 +84,15 @@ class TemplateRequest extends FormRequest
         $rules = [];
 
         foreach (BaseTemplates::editableSettings($this->chosenBaseTemplate()) as $key => $setting) {
+            // A choice is one of the names the design offers, and nothing
+            // else — a stylesheet has a rule per option and none for a value
+            // invented by a hand-crafted request.
+            if (isset($setting['options'])) {
+                $rules['settings.'.$key] = ['nullable', Rule::in($setting['options'])];
+
+                continue;
+            }
+
             $rule = ['nullable', isset($setting['step']) ? 'numeric' : 'integer'];
 
             if (isset($setting['min'])) {
@@ -161,13 +170,15 @@ class TemplateRequest extends FormRequest
                 $editable
             );
 
-            // Stored as numbers, not the strings a form sends. The model casts
-            // on read too, but there is no reason to keep strings in the column
-            // when the shape is known here.
+            // Stored as the type each was declared as, not the strings a form
+            // sends. The model casts on read too, but there is no reason to
+            // keep strings in the column when the shape is known here.
             foreach ($settings as $key => $value) {
-                $settings[$key] = isset($editable[$key]['step'])
-                    ? (float) $value
-                    : (int) $value;
+                $settings[$key] = match (true) {
+                    isset($editable[$key]['options']) => (string) $value,
+                    isset($editable[$key]['step']) => (float) $value,
+                    default => (int) $value,
+                };
             }
 
             $data['settings'] = $settings;

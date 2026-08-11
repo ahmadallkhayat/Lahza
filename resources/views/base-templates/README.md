@@ -50,6 +50,15 @@ return [
             'max'     => 9000,
         ],
 
+        // A named choice rather than a number: rendered as a select,
+        // validated against the list, and reaching the page as a string.
+        'opening' => [
+            'label'   => 'Opening',
+            'default' => 'envelope',
+            'options' => ['envelope', 'veil'],
+            'labels'  => ['envelope' => 'Envelope', 'veil' => 'Veil'],
+        ],
+
         // No label ⇒ the design's own business. It still reaches the page as
         // CONFIG, but no field is drawn and no request can set it.
         'settleMs' => ['default' => 77],
@@ -72,13 +81,23 @@ fine; it just will not be filled automatically.
 
 ### settings
 
-Numbers the design animates on, handed to the page as `CONFIG`. Declare `step`
-to make one a decimal (`duckTo` is the only one today); everything else is a
-whole number. `min`/`max` become the validation bounds *and* the input's
-attributes.
+What the design animates on, handed to the page as `CONFIG` and available in
+Blade as `$s['key']`.
+
+| Declared | Becomes | Validated as |
+|---|---|---|
+| plain `default` | number input, step 1 | `integer`, plus `min`/`max` |
+| `step` | number input, that step | `numeric`, plus `min`/`max` |
+| `options` | a select | `Rule::in(options)` |
+
+`min`/`max` become the validation bounds *and* the input's attributes. A choice
+reaches the page as a string and is checked twice — rejected on save, and again
+on read, so a value the design has since dropped falls back to the default
+rather than reaching a stylesheet with no rule for it. `labels` gives each
+option its wording; without it the option name is headlined.
 
 The label rule is the whole of the editable/internal distinction: if the design
-gave a timing a name the studio would understand, the studio can change it.
+gave a setting a name the studio would understand, the studio can change it.
 
 ### slots and groups
 

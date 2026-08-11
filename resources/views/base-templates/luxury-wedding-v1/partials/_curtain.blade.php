@@ -1,4 +1,23 @@
-<div id="curtain">
+{{-- ── The opening ──────────────────────────────────────────────────
+     What is on screen before the tap: the clip's own first frame, held
+     blurred and dimmed by #intro.veiled, with the envelope drawn over it.
+
+     The envelope is translucent rather than opaque, so the wedding's own
+     footage is what the guest is looking at while they wait — the panels
+     only tint it and draw the flap's seam. On tap the flap lifts away and
+     the pocket falls, the blur clears, and the clip is already playing
+     underneath. Nothing is covered and then uncovered; it is one move.
+
+     Declared per theme: a design that wants none of this sets `opening`
+     to "veil" and gets the plain dissolve this used to be. --}}
+<div id="curtain" data-opening="{{ $s['opening'] }}">
+    @if ($s['opening'] === 'envelope')
+        <div class="env" aria-hidden="true">
+            <span class="env-pocket"></span>
+            <span class="env-flap"></span>
+        </div>
+    @endif
+
     {{-- Shown until the clip can actually play.
          The prompt used to appear the moment the markup did, so a guest on a
          slow connection tapped a button that could not do anything yet —

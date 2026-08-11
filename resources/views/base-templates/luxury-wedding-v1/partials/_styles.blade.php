@@ -11,6 +11,12 @@
   --shell: 30rem;
   --fade: {{ $s['crossfadeMs'] }}ms;
 
+  /* The opening. --open is the flap's own travel; the pocket and the blur
+     are timed off it so the whole move reads as one gesture. */
+  --open: {{ $s['openingMs'] }}ms;
+  --veil-blur: {{ $s['veilBlurPx'] }}px;
+  --veil-dim: {{ $s['veilDim'] }};
+
   /* Arrivals decelerate hard and settle — a flat `ease` is nearly linear
      through the middle, which is what made every transition feel like it was
      being dragged rather than released. */
@@ -89,11 +95,40 @@ body::before {
 
 /* The intro plays sharp, then hands over. Tied to --fade (crossfadeMs) so the
    clip's dissolve and the curtain's are the same length by construction. */
+/* filter and transform run on --open, not --fade: the only time they move
+   from here is the veil clearing as the envelope opens, and that has to be
+   the same length as the flap's travel. Opacity keeps --fade, which is the
+   clip's own dissolve. The ambient handover later overrides both back. */
 #intro {
   opacity: 0;
-  transition: opacity var(--fade) var(--ease-soft), filter var(--fade) var(--ease-soft);
+  transition:
+    opacity var(--fade) var(--ease-soft),
+    filter var(--open) var(--ease-soft),
+    transform var(--open) var(--ease-soft);
 }
 #intro.playing { opacity: 1; }
+
+/* ─── THE HELD FIRST FRAME ────────────────────────────────────────
+   Before the tap, the clip's own first frame is what fills the screen —
+   blurred past reading and dimmed so the prompt sits clearly on it. The
+   guest is already looking at this wedding rather than at a flat colour.
+
+   The element is the same #intro that will play: paused at 0, so there is
+   nothing extra to load and no second decode. Scaled up because a blur
+   samples past its own edges and would otherwise show a soft border.
+
+   Its transition is --open rather than --fade: this one clears as the
+   envelope opens, and the two have to be the same gesture. .playing takes
+   over from here and carries no filter, so tapping resolves the blur. */
+#intro.veiled {
+  opacity: 1;
+  filter: blur(var(--veil-blur)) saturate(1.05) brightness(var(--veil-dim));
+  transform: scale(1.12);
+  transition:
+    opacity var(--open) var(--ease-soft),
+    filter var(--open) var(--ease-soft),
+    transform var(--open) var(--ease-soft);
+}
 
 /* Already slowed at encode time, so it plays at rate 1.0 — see
    AmbientVideoEncoder. Scaled up so the blur has material to bleed from and
@@ -117,6 +152,12 @@ body::before {
   filter: blur(30px) saturate(1.1);
   transform: scale(1.15);
   opacity: .18;
+  /* Back to --fade: this is the crossfade into the backdrop, a different
+     moment from the opening and paced with the rest of the reveal. */
+  transition:
+    opacity var(--fade) var(--ease-soft),
+    filter var(--fade) var(--ease-soft),
+    transform var(--fade) var(--ease-soft);
 }
 
 /* Handed over to the reversed encode. Both are blurred identically by now, so
@@ -137,10 +178,105 @@ body::before {
   display: grid;
   place-items: center;
   cursor: pointer;
+  /* Depth for the flap to fold through. Large enough that the rotation
+     reads as a hinge rather than a fisheye. */
+  perspective: 1600px;
   transition: background-color var(--fade) var(--ease-soft), opacity var(--fade) var(--ease-soft);
 }
 #curtain.opened { background-color: transparent; }
 #curtain.gone { opacity: 0; pointer-events: none; }
+
+@if ($s['opening'] === 'envelope')
+/* ─── THE ENVELOPE ────────────────────────────────────────────────
+   Drawn over the held frame rather than instead of it: both panels are
+   translucent, so the blurred footage reads through them and the envelope
+   is a tint and a seam rather than a lid.
+
+   Emitted only for the opening that uses it. The veil ships none of this,
+   which is also what lets a test tell the two openings apart by looking at
+   the page rather than by trusting the setting it just set.
+
+   The curtain's own fill is dropped for this variant — the panels are the
+   cover now, and leaving a solid colour underneath them would hide the
+   very frame they are supposed to sit on. */
+#curtain[data-opening="envelope"] { background: transparent; }
+
+.env {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.env-pocket,
+.env-flap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: block;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--curtain) 62%, transparent),
+      color-mix(in srgb, var(--curtain) 86%, transparent)
+    );
+}
+
+/* The body of the envelope, covering the whole screen. It does not fold —
+   it settles downward and dissolves, which is what selling the flap as the
+   thing that moved depends on. */
+.env-pocket {
+  top: 0;
+  bottom: 0;
+  transition:
+    opacity calc(var(--open) * .75) var(--ease-soft),
+    transform calc(var(--open) * .75) var(--ease-soft);
+}
+
+/* The flap: a triangle hinged along the top edge.
+
+   drop-shadow rather than a border, because a border follows the element's
+   box and this shape is a clip-path — only a filter traces the cut edge, so
+   this is what draws the gold seam down both diagonals. */
+.env-flap {
+  top: 0;
+  height: 58%;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transform-origin: top center;
+  backface-visibility: hidden;
+  filter: drop-shadow(0 1px 0 color-mix(in srgb, var(--gold) 45%, transparent));
+  transition: transform var(--open) cubic-bezier(.62, .02, .2, 1);
+}
+
+/* Opened: the flap swings back over the top edge, the pocket falls away.
+   Just short of a half turn — a flat 180° lands edge-on and disappears for
+   a frame, which reads as a glitch rather than a fold. */
+#curtain.opened .env-flap { transform: rotateX(-168deg); }
+
+#curtain.opened .env-pocket {
+  opacity: 0;
+  transform: translateY(7%);
+  /* Held back so the flap is visibly moving first. Opening both at once
+     reads as the screen fading, not as an envelope. */
+  transition-delay: calc(var(--open) * .22);
+}
+
+/* A fold this size is the point of the whole opening, so it is not worth
+   half-doing on reduced motion: the panels simply dissolve in place. */
+@media (prefers-reduced-motion: reduce) {
+  .env-flap,
+  .env-pocket {
+    transition: opacity calc(var(--open) * .5) linear;
+  }
+
+  #curtain.opened .env-flap,
+  #curtain.opened .env-pocket {
+    opacity: 0;
+    transform: none;
+    transition-delay: 0s;
+  }
+}
+@endif
 
 /* ─── LOADING ────────────────────────────────────────────────────
    The mark, in the theme's colours, while the clip buffers. Both this and the
