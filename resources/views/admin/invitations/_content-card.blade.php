@@ -18,26 +18,31 @@
     title="Content"
     description="Written once per language. Each language's guest link shows its own."
 >
-    <x-slot:actions>
-        <div class="flex items-center gap-2">
-            <span
-                x-show="translating"
-                x-cloak
-                class="text-xs text-ink-500"
-            >Translating…</span>
+    {{-- Studio only. Every press is a call to a paid third-party API, and
+         the route behind it is under /admin, so offering it to a customer
+         would be a button that bills the studio and then 404s. --}}
+    @if ($studio)
+        <x-slot:actions>
+            <div class="flex items-center gap-2">
+                <span
+                    x-show="translating"
+                    x-cloak
+                    class="text-xs text-ink-500"
+                >Translating…</span>
 
-            <x-ui.button
-                type="button"
-                variant="secondary"
-                size="sm"
-                icon="language"
-                x-bind:disabled="translating || locales.length < 2 || ! has('en')"
-                x-on:click="translateFromEnglish()"
-            >
-                Translate from English
-            </x-ui.button>
-        </div>
-    </x-slot:actions>
+                <x-ui.button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    icon="language"
+                    x-bind:disabled="translating || locales.length < 2 || ! has('en')"
+                    x-on:click="translateFromEnglish()"
+                >
+                    Translate from English
+                </x-ui.button>
+            </div>
+        </x-slot:actions>
+    @endif
 
     {{-- Outcome of the last translation attempt. --}}
     <template x-if="translateNote">
@@ -52,9 +57,11 @@
         </div>
     </template>
 
-    <p x-show="! has('en')" x-cloak class="mb-5 text-xs text-ink-500">
-        Tick English to use the translate button — it works from the English text.
-    </p>
+    @if ($studio)
+        <p x-show="! has('en')" x-cloak class="mb-5 text-xs text-ink-500">
+            Tick English to use the translate button — it works from the English text.
+        </p>
+    @endif
 
     {{-- ── Text fields, one column per language ─────────────────────── --}}
     <div class="space-y-5">

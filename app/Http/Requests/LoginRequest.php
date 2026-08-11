@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Admin;
+namespace App\Http\Requests;
 
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
@@ -9,9 +9,17 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Signing in, from either door.
+ *
+ * Shared by the studio's sign-in and the customer one: the credentials, the
+ * throttle and the deliberately vague failure are the same problem whichever
+ * side is asking, and two copies of a lockout rule is one copy that quietly
+ * stops matching the other.
+ */
 class LoginRequest extends FormRequest
 {
-    /** Attempts allowed per email + IP pair before lockout. */
+    /** Attempts allowed per username + IP pair before lockout. */
     private const MAX_ATTEMPTS = 5;
 
     public function authorize(): bool

@@ -3,7 +3,7 @@
      The mark carries its own letterforms, but only legibly at size. So pass
      `wordmark` anywhere it runs small — the sidebar and the mobile bar — and
      leave it off where the mark is large enough to stand alone, as on sign-in
-     and the coming-soon page. --}}
+     and the landing page's hero. --}}
 @props(['href' => null, 'wordmark' => false, 'size' => 'h-9'])
 
 <{{ $href ? 'a' : 'div' }}

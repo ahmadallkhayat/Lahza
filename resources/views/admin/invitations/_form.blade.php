@@ -1,4 +1,11 @@
 @php
+    /* Whether the studio is the one filling this in.
+       The same form serves both sides — a customer building their own
+       invitation needs every field the studio does, and keeping one form is
+       what stops the two drifting into different validation. Only the
+       affordances that are genuinely the studio's are gated on this. */
+    $studio = $studio ?? true;
+
     $local = $invitation->exists ? $invitation->startsAtLocal() : null;
     $localeMeta = config('templates.locales');
     $codes = array_keys($localeMeta);

@@ -24,6 +24,7 @@ class Invitation extends Model
     public const TRANSLATABLE = ['hosts', 'venue_name', 'venue_city'];
 
     protected $fillable = [
+        'user_id',
         'template_id',
         'slug',
         'locales',
@@ -88,6 +89,27 @@ class Invitation extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(Template::class);
+    }
+
+    /**
+     * The customer this belongs to, if it belongs to one.
+     *
+     * Null means the studio holds it — either because it was built before
+     * accounts existed, or because the studio made it on someone's behalf
+     * without one. That is a normal state, not a missing relation.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function belongsToUser(?User $user): bool
+    {
+        return $user !== null
+            && $this->user_id !== null
+            && $this->user_id === $user->id;
     }
 
     /* ── locales ──────────────────────────────────────────────────── */

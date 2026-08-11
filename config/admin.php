@@ -48,11 +48,23 @@ return [
                     'icon' => 'envelope-open',
                     'active' => 'admin.invitations.*',
                 ],
+                [
+                    'label' => 'Customers',
+                    'route' => 'admin.customers.index',
+                    'icon' => 'users',
+                    'active' => 'admin.customers.*',
+                ],
             ],
         ],
         [
             'heading' => 'Settings',
             'items' => [
+                [
+                    'label' => 'Site',
+                    'route' => 'admin.settings.edit',
+                    'icon' => 'globe-alt',
+                    'active' => 'admin.settings.*',
+                ],
                 [
                     'label' => 'Account',
                     'route' => 'admin.account.edit',

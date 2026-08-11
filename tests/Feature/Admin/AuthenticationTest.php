@@ -23,7 +23,13 @@ class AuthenticationTest extends TestCase
 
     public function test_landing_page_is_public(): void
     {
-        $this->get('/')->assertOk()->assertSee('Coming soon');
+        // What it says now comes from SiteSettings, so this asserts that the
+        // page renders for a guest and offers both doors — not any particular
+        // wording, which the studio can change without touching code.
+        $this->get('/')
+            ->assertOk()
+            ->assertSee(route('register'), false)
+            ->assertSee(route('login'), false);
     }
 
     public function test_login_screen_renders(): void
@@ -110,14 +116,30 @@ class AuthenticationTest extends TestCase
     }
 
     /**
-     * Accounts are created by seeder or console only. If a registration
-     * route ever gets added by accident, this fails.
+     * Sign-up is open, and it only ever makes customers.
+     *
+     * This used to assert the opposite — that /register did not exist at all.
+     * It exists now, which makes the thing worth guarding the *other* half of
+     * that promise: that no route out here can mint an account which reaches
+     * the studio. A role smuggled into the request must be ignored.
      */
-    public function test_there_is_no_public_registration(): void
+    public function test_public_registration_cannot_create_an_admin(): void
     {
-        $this->get('/register')->assertNotFound();
-        $this->post('/register')->assertNotFound();
-        $this->get('/login')->assertNotFound();
+        $this->get('/register')->assertOk();
+
+        $this->post('/register', [
+            'name' => 'Sara',
+            'username' => 'sara',
+            'email' => 'sara@example.test',
+            'password' => 'correct-horse-battery',
+            'password_confirmation' => 'correct-horse-battery',
+            'role' => User::ROLE_ADMIN,
+        ])->assertRedirect(route('account.dashboard'));
+
+        $user = User::where('username', 'sara')->sole();
+
+        $this->assertSame(User::ROLE_CUSTOMER, $user->role);
+        $this->assertFalse($user->isAdmin());
     }
 
     public function test_login_is_rate_limited_after_five_attempts(): void

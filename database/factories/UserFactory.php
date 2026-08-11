@@ -32,7 +32,23 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+
+            // The studio by default: almost every test that makes a user is
+            // signing in to the admin, and the ones that want a customer say
+            // so. Flipping this would quietly unauthorise those instead of
+            // failing loudly, which is the worse direction to be wrong in.
+            'role' => User::ROLE_ADMIN,
         ];
+    }
+
+    public function customer(): static
+    {
+        return $this->state(fn () => ['role' => User::ROLE_CUSTOMER]);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn () => ['role' => User::ROLE_ADMIN]);
     }
 
     /**
