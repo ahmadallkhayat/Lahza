@@ -8,17 +8,9 @@
      Both inputs per role share one x-model, which is also what keeps the colour
      picker and the hex box in step. --}}
 
-@php
-    $roles = [
-        'paper' => 'Page background',
-        'paper_deep' => 'Panel fill',
-        'ink' => 'Primary text',
-        'ink_soft' => 'Secondary text',
-        'gold' => 'Accent',
-        'gold_deep' => 'Accent (text safe)',
-        'curtain' => 'Intro backdrop',
-    ];
-@endphp
+{{-- $paletteRoles comes from _form.blade.php, which reads it off the chosen
+     design's manifest: the roles a design paints with are its own declaration,
+     not a list kept here. --}}
 
 {{-- x-data goes on a plain wrapper, not on the card component: Blade compiles
      component attributes into a PHP array, so quotes inside the expression break
@@ -120,7 +112,8 @@
 
     {{-- The values that actually save --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        @foreach ($roles as $key => $label)
+        @foreach ($paletteRoles as $key => $role)
+            @php($label = $role['label'])
             <x-ui.field :label="$label" :name="'palette.'.$key" :for="'palette_'.$key">
                 <div class="flex items-center gap-2">
                     <input

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Invitation;
 use App\Models\Template;
 use App\Models\User;
+use App\Support\BaseTemplates;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -133,10 +134,14 @@ class InvitationPageTest extends TestCase
             'settings' => ['fogHz' => 400],
         ]);
 
+        // The defaults are the design's own, declared in its template.php.
+        $palette = BaseTemplates::paletteDefaults($template->base_template);
+        $settings = BaseTemplates::settingDefaults($template->base_template);
+
         // Overrides win, everything else still has a value.
         $this->assertSame('#ffffff', $template->palette()['gold']);
-        $this->assertSame(Template::DEFAULT_PALETTE['paper'], $template->palette()['paper']);
+        $this->assertSame($palette['paper'], $template->palette()['paper']);
         $this->assertSame(400, $template->settings()['fogHz']);
-        $this->assertSame(Template::DEFAULT_SETTINGS['crossfadeMs'], $template->settings()['crossfadeMs']);
+        $this->assertSame($settings['crossfadeMs'], $template->settings()['crossfadeMs']);
     }
 }

@@ -19,19 +19,28 @@
         ? $musicAssets->firstWhere('path', $template->music)
         : null;
 
-    // Colour roles live in _colours.blade.php, alongside the picker.
-    $settingLabels = [
-        'keepVideoAudioMs' => ['Keep video audio', 'ms before muting the clip. 0 keeps it silent throughout.'],
-        'musicFadeMs' => ['Music fade in', 'ms for the music to reach full volume.'],
-        'fadeOutLeadMs' => ['Dissolve lead', 'ms before the clip ends that the crossfade begins.'],
-        'namesLeadMs' => ['Names lead', 'ms before the clip ends that the names appear over it.'],
-        'blurLeadMs' => ['Blur hold', 'ms the softened clip holds alone before the content arrives.'],
-        'crossfadeMs' => ['Dissolve length', 'ms for the video to dissolve into the invitation.'],
-        'duckTo' => ['Music duck level', '0–1. Volume once the invitation is showing.'],
-        'fogHz' => ['Muffle cutoff', 'Hz low-pass after the reveal. Lower sounds more distant.'],
-        'duckMs' => ['Settle duration', 'ms for the music to pull back and blur.'],
-        'revealFallbackMs' => ['Safety fallback', 'ms after which the invitation shows even if the clip never plays.'],
-    ];
+    /* The design this theme is built on, and what it declares.
+       Timings and colour roles both come from its manifest rather than from
+       lists kept here — a design with no petals should not be offered a petal
+       duration, and one with a colour role of its own should be.
+
+       Read from the submitted value first so a failed save redisplays the
+       fields of the design that was being chosen, not the one stored, and
+       falls back to the first design on the create page where none is chosen
+       yet. Switching design shows the new one's fields after saving, since
+       only the server knows what a design declares — the same arrangement the
+       invitation form uses for the slots that follow its theme. */
+    $selectedBase = old('base_template', $template->base_template);
+
+    // Only for deciding which fields to draw — never for the select itself,
+    // which keeps its "Select a base template" placeholder so choosing one
+    // stays a deliberate act rather than a default nobody noticed.
+    $chosenBase = $selectedBase ?: array_key_first($baseTemplates);
+
+    $settingFields = \App\Support\BaseTemplates::editableSettings($chosenBase);
+
+    // Colour roles are rendered in _colours.blade.php, alongside the picker.
+    $paletteRoles = \App\Support\BaseTemplates::palette($chosenBase);
 @endphp
 
 <x-ui.card title="Theme" description="A custom theme built on one of the base templates.">
@@ -46,10 +55,17 @@
             required
             hint="The design this theme is built on. Each is a directory under resources/views/base-templates."
         >
+            {{-- Grouped by occasion. With one design the optgroup is barely
+                 visible; with a dozen across weddings, graduations and baby
+                 showers it is the difference between a catalogue and a list. --}}
             <x-ui.select name="base_template" required>
                 <option value="">Select a base template</option>
-                @foreach ($baseTemplates as $key => $label)
-                    <option value="{{ $key }}" @selected(old('base_template', $template->base_template) === $key)>{{ $label }}</option>
+                @foreach (\App\Support\BaseTemplates::grouped() as $category => $designs)
+                    <optgroup label="{{ $category }}">
+                        @foreach ($designs as $key => $label)
+                            <option value="{{ $key }}" @selected($selectedBase === $key)>{{ $label }}</option>
+                        @endforeach
+                    </optgroup>
                 @endforeach
             </x-ui.select>
         </x-ui.field>
@@ -252,23 +268,32 @@
 {{-- Collapsed by default: the defaults are usually right, and eight number
      fields between the media and the save button is a lot to scroll past on
      every edit. --}}
-<x-ui.card
-    title="Reveal timings"
-    description="How the intro hands over to the invitation. The defaults suit most templates."
-    collapsible
-    :open="$errors->hasAny(array_map(fn ($k) => 'settings.'.$k, array_keys($settingLabels)))"
->
-    <div class="grid gap-5 sm:grid-cols-2">
-        @foreach ($settingLabels as $key => [$label, $hint])
-            <x-ui.field :label="$label" :name="'settings.'.$key" :for="'settings_'.$key" :hint="$hint">
-                <x-ui.input
-                    type="number"
-                    :name="'settings['.$key.']'"
-                    :id="'settings_'.$key"
-                    :value="$settings[$key] ?? \App\Models\Template::DEFAULT_SETTINGS[$key]"
-                    step="{{ $key === 'duckTo' ? '0.01' : '1' }}"
-                />
-            </x-ui.field>
-        @endforeach
-    </div>
-</x-ui.card>
+@if ($settingFields)
+    <x-ui.card
+        title="Reveal timings"
+        description="How the intro hands over to the invitation. The defaults suit most templates."
+        collapsible
+        :open="$errors->hasAny(array_map(fn ($k) => 'settings.'.$k, array_keys($settingFields)))"
+    >
+        <div class="grid gap-5 sm:grid-cols-2">
+            @foreach ($settingFields as $key => $field)
+                <x-ui.field
+                    :label="$field['label']"
+                    :name="'settings.'.$key"
+                    :for="'settings_'.$key"
+                    :hint="$field['hint'] ?? null"
+                >
+                    <x-ui.input
+                        type="number"
+                        :name="'settings['.$key.']'"
+                        :id="'settings_'.$key"
+                        :value="$settings[$key] ?? $field['default']"
+                        :step="$field['step'] ?? 1"
+                        :min="$field['min'] ?? null"
+                        :max="$field['max'] ?? null"
+                    />
+                </x-ui.field>
+            @endforeach
+        </div>
+    </x-ui.card>
+@endif

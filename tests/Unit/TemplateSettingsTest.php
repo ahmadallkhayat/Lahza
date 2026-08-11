@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\Template;
 use App\Models\User;
+use App\Support\BaseTemplates;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -50,10 +51,45 @@ class TemplateSettingsTest extends TestCase
         $template = Template::factory()->create(['settings' => ['fogHz' => 500]]);
 
         $settings = $template->settings();
+        $declared = BaseTemplates::settingDefaults($template->base_template);
 
         $this->assertSame(500, $settings['fogHz']);
-        $this->assertSame(Template::DEFAULT_SETTINGS['crossfadeMs'], $settings['crossfadeMs']);
-        $this->assertCount(count(Template::DEFAULT_SETTINGS), $settings);
+        $this->assertSame($declared['crossfadeMs'], $settings['crossfadeMs']);
+
+        // Every timing the design declares reaches the page, including the
+        // unlabelled ones the studio never sees — those are what the design's
+        // own JavaScript reads off CONFIG.
+        $this->assertCount(count($declared), $settings);
+    }
+
+    /**
+     * A timing belongs to the design that declares it, not to every theme.
+     *
+     * This is the property that lets a second base template exist: its own
+     * template.php declares its own timings, and a theme built on it gets
+     * those rather than this design's petals and blur holds.
+     */
+    public function test_settings_are_the_chosen_designs_own(): void
+    {
+        $template = Template::factory()->create(['base_template' => 'luxury-wedding-v1']);
+
+        $settings = $template->settings();
+
+        $this->assertArrayHasKey('petalsMs', $settings);
+        $this->assertSame(
+            array_keys(BaseTemplates::settingDefaults('luxury-wedding-v1')),
+            array_keys($settings),
+        );
+    }
+
+    /** A value for a timing the design never declared is not stored or served. */
+    public function test_a_timing_the_design_does_not_declare_is_dropped(): void
+    {
+        $template = Template::factory()->create([
+            'settings' => ['fogHz' => 500, 'somethingElseMs' => 900],
+        ]);
+
+        $this->assertArrayNotHasKey('somethingElseMs', $template->settings());
     }
 
     public function test_the_form_stores_numbers_not_strings(): void

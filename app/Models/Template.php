@@ -11,48 +11,6 @@ class Template extends Model
 {
     use HasFactory;
 
-    /** Reveal timings, applied when a template leaves any of them unset. */
-    public const DEFAULT_SETTINGS = [
-        'keepVideoAudioMs' => 0,
-        'musicFadeMs' => 1600,
-        'fadeOutLeadMs' => 800,
-
-        // How long before the clip ends the names appear. Larger than
-        // fadeOutLeadMs on purpose: the difference is how long the names have
-        // the video to themselves before it starts dissolving.
-        'namesLeadMs' => 2600,
-
-        // How long the softened backdrop has the screen to itself before the
-        // rest of the invitation arrives. This is the gap that makes the blur
-        // its own beat: the names sit over the clip, the clip softens, and only
-        // then does the content assemble. Set it to 0 and the blur happens
-        // behind arriving content, which is what it used to do.
-        'blurLeadMs' => 1200,
-
-        // How long petals keep falling after the reveal before thinning out.
-        'petalsMs' => 22000,
-        'crossfadeMs' => 1400,
-        'duckTo' => 0.42,
-        'fogHz' => 700,
-        'duckMs' => 2600,
-        // Longest the mark holds before the prompt appears regardless. A clip
-        // that cannot be reached must not leave a guest waiting on a spinner.
-        'loaderTimeoutMs' => 8000,
-
-        'revealFallbackMs' => 13000,
-    ];
-
-    /** Colour roles every design expects to be able to reference. */
-    public const DEFAULT_PALETTE = [
-        'paper' => '#f7f1e8',
-        'paper_deep' => '#ede1d0',
-        'ink' => '#2e1d16',
-        'ink_soft' => '#6b5648',
-        'gold' => '#a8874f',
-        'gold_deep' => '#856a3c',
-        'curtain' => '#1a0f0d',
-    ];
-
     protected $fillable = [
         'name',
         'slug',
@@ -81,19 +39,26 @@ class Template extends Model
     }
 
     /**
-     * Palette merged over the defaults, so a design never renders with a
-     * missing colour if a new role is added later.
+     * Palette merged over this design's own defaults, so a theme never
+     * renders with a missing colour if a role is added to the design later.
+     *
+     * Which roles exist is the design's declaration, not a global list: a
+     * theme built on a design that paints with four colours gets four, and
+     * one stored role the design has since dropped is left behind rather
+     * than handed to a page that has no use for it.
      *
      * @return array<string, string>
      */
     public function palette(): array
     {
-        return array_merge(self::DEFAULT_PALETTE, $this->palette ?? []);
+        $defaults = BaseTemplates::paletteDefaults($this->base_template);
+
+        return array_merge($defaults, array_intersect_key($this->palette ?? [], $defaults));
     }
 
     /**
-     * Timings merged over the defaults, for the same reason, and cast to real
-     * numbers.
+     * Timings merged over this design's own defaults, for the same reason,
+     * and cast to real numbers.
      *
      * The casting is not cosmetic. Form input arrives as strings, and the
      * template's JavaScript compares one of these strictly: `"0" === 0` is
@@ -106,11 +71,13 @@ class Template extends Model
      */
     public function settings(): array
     {
-        $merged = array_merge(self::DEFAULT_SETTINGS, $this->settings ?? []);
+        $defaults = BaseTemplates::settingDefaults($this->base_template);
+        $merged = array_merge($defaults, array_intersect_key($this->settings ?? [], $defaults));
+
         $cast = [];
 
         foreach ($merged as $key => $value) {
-            $cast[$key] = is_float(self::DEFAULT_SETTINGS[$key] ?? 0)
+            $cast[$key] = is_float($defaults[$key] ?? 0)
                 ? (float) $value
                 : (int) $value;
         }

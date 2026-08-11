@@ -2,15 +2,14 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\File;
-
 /**
  * The content a base template declares it can carry.
  *
- * Read from each design's template.php manifest. One declaration drives the
- * fields on the invitation form, the categories a text asset can be filed
- * under, and what the guest page renders — so a slot cannot exist in one of
- * those and be missing from another.
+ * The slot half of each design's template.php manifest, which BaseTemplates
+ * parses and this reads. One declaration drives the fields on the invitation
+ * form, the categories a text asset can be filed under, and what the guest
+ * page renders — so a slot cannot exist in one of those and be missing from
+ * another.
  *
  * That was the failure this replaces: Asset::TEXT_FIELDS offered "verse" and
  * "programme step" as places to file a block of text, while the invitation
@@ -36,9 +35,6 @@ final class ContentSlots
         'venue_city' => 'City',
     ];
 
-    /** @var array<string, array<string, mixed>>|null */
-    private static ?array $cache = null;
-
     /**
      * Slots declared by one design, in declaration order.
      *
@@ -46,23 +42,7 @@ final class ContentSlots
      */
     public static function for(?string $baseTemplate): array
     {
-        if ($baseTemplate === null) {
-            return [];
-        }
-
-        return self::manifests()[$baseTemplate]['slots'] ?? [];
-    }
-
-    /**
-     * A design's own label, falling back to the one derived from its directory
-     * name. Lets a design be called "Luxury Wedding V1" rather than whatever
-     * headlining its folder produces.
-     */
-    public static function label(string $baseTemplate, string $fallback): string
-    {
-        $label = self::manifests()[$baseTemplate]['label'] ?? null;
-
-        return is_string($label) && $label !== '' ? $label : $fallback;
+        return BaseTemplates::manifest($baseTemplate)['slots'] ?? [];
     }
 
     /**
@@ -83,7 +63,7 @@ final class ContentSlots
     {
         $fields = self::CORE;
 
-        foreach (self::manifests() as $manifest) {
+        foreach (BaseTemplates::manifests() as $manifest) {
             foreach ($manifest['slots'] ?? [] as $key => $slot) {
                 if (filled($slot['group'] ?? null)) {
                     continue;
@@ -120,7 +100,7 @@ final class ContentSlots
      */
     public static function groups(?string $baseTemplate): array
     {
-        $declared = self::manifests()[$baseTemplate]['groups'] ?? [];
+        $declared = BaseTemplates::manifest($baseTemplate)['groups'] ?? [];
         $slots = self::for($baseTemplate);
 
         $groups = [];
@@ -202,45 +182,14 @@ final class ContentSlots
         return trim((string) __($key, [], $locale));
     }
 
-    /** Forget the parsed manifests. For tests that write one at runtime. */
+    /**
+     * Forget the parsed manifests. For tests that write one at runtime.
+     *
+     * Delegated: the manifests are parsed and cached once in BaseTemplates
+     * and read from there, so there is no second copy here to invalidate.
+     */
     public static function flush(): void
     {
-        self::$cache = null;
-    }
-
-    /**
-     * Every design's manifest, parsed once.
-     *
-     * @return array<string, array<string, mixed>>
-     */
-    private static function manifests(): array
-    {
-        if (self::$cache !== null) {
-            return self::$cache;
-        }
-
-        $found = [];
-        $root = resource_path(BaseTemplates::ROOT);
-
-        // Scanned here rather than asked of BaseTemplates::available(), which
-        // reads label() off this class to let a design name itself — going the
-        // other way too would be an infinite loop.
-        if (File::isDirectory($root)) {
-            foreach (File::directories($root) as $dir) {
-                $path = $dir.'/template.php';
-
-                if (! File::exists($path)) {
-                    continue;
-                }
-
-                $manifest = require $path;
-
-                if (is_array($manifest)) {
-                    $found[basename($dir)] = $manifest;
-                }
-            }
-        }
-
-        return self::$cache = $found;
+        BaseTemplates::flush();
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin;
 
 use App\Models\Asset;
-use App\Models\Template;
 use App\Support\BaseTemplates;
 use App\Support\UploadLimit;
 use Illuminate\Foundation\Http\FormRequest;
@@ -61,17 +60,64 @@ class TemplateRequest extends FormRequest
             'palette.*' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
 
             'settings' => ['array'],
-            'settings.keepVideoAudioMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
-            'settings.musicFadeMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
-            'settings.fadeOutLeadMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
-            'settings.namesLeadMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
-            'settings.blurLeadMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
-            'settings.crossfadeMs' => ['nullable', 'integer', 'min:100', 'max:60000'],
-            'settings.duckTo' => ['nullable', 'numeric', 'min:0', 'max:1'],
-            'settings.fogHz' => ['nullable', 'integer', 'min:100', 'max:20000'],
-            'settings.duckMs' => ['nullable', 'integer', 'min:0', 'max:60000'],
-            'settings.revealFallbackMs' => ['nullable', 'integer', 'min:1000', 'max:120000'],
+
+            // Built from whichever design this theme is being saved against,
+            // rather than one fixed list. A design that animates on timings of
+            // its own gets them validated with its own bounds, and a timing it
+            // never declared has no rule here and is dropped by cleaned().
+            ...$this->settingRules(),
         ];
+    }
+
+    /**
+     * A rule per timing the chosen design lets the studio change.
+     *
+     * Unlabelled timings are deliberately absent: those are the design's own
+     * safety margins, never rendered as a field, so accepting one from a
+     * request would only let a hand-crafted post override something the
+     * studio cannot even see.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function settingRules(): array
+    {
+        $rules = [];
+
+        foreach (BaseTemplates::editableSettings($this->chosenBaseTemplate()) as $key => $setting) {
+            $rule = ['nullable', isset($setting['step']) ? 'numeric' : 'integer'];
+
+            if (isset($setting['min'])) {
+                $rule[] = 'min:'.$setting['min'];
+            }
+
+            if (isset($setting['max'])) {
+                $rule[] = 'max:'.$setting['max'];
+            }
+
+            $rules['settings.'.$key] = $rule;
+        }
+
+        return $rules;
+    }
+
+    /**
+     * The design this save is for.
+     *
+     * Read from the request rather than the stored row, because the form can
+     * move a theme from one design to another in the same save that sets its
+     * timings — validating the incoming values against the design being left
+     * behind would reject the ones being arrived at. Falls back to the stored
+     * design for a request that does not mention one.
+     */
+    private function chosenBaseTemplate(): ?string
+    {
+        $submitted = $this->input('base_template');
+
+        if (is_string($submitted) && BaseTemplates::exists($submitted)) {
+            return $submitted;
+        }
+
+        return $this->route('template')?->base_template;
     }
 
     public function messages(): array
@@ -96,26 +142,30 @@ class TemplateRequest extends FormRequest
         // an absent key to an empty array meant a save that never mentioned
         // colours wiped the ones already stored — quiet data loss, and
         // especially unwelcome after they were derived from a video.
+        $base = $this->chosenBaseTemplate();
+
         if ($this->has('palette')) {
             $data['palette'] = array_intersect_key(
                 array_filter($data['palette'] ?? [], fn ($v) => filled($v)),
-                Template::DEFAULT_PALETTE
+                BaseTemplates::palette($base)
             );
         } else {
             unset($data['palette']);
         }
 
         if ($this->has('settings')) {
+            $editable = BaseTemplates::editableSettings($base);
+
             $settings = array_intersect_key(
                 array_filter($data['settings'] ?? [], fn ($v) => $v !== null && $v !== ''),
-                Template::DEFAULT_SETTINGS
+                $editable
             );
 
             // Stored as numbers, not the strings a form sends. The model casts
             // on read too, but there is no reason to keep strings in the column
             // when the shape is known here.
             foreach ($settings as $key => $value) {
-                $settings[$key] = is_float(Template::DEFAULT_SETTINGS[$key])
+                $settings[$key] = isset($editable[$key]['step'])
                     ? (float) $value
                     : (int) $value;
             }
