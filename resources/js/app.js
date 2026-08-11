@@ -6,6 +6,7 @@ import invitationForm from './admin/invitation-form';
 import palettePicker from './admin/palette-picker';
 import settingsForm from './admin/settings-form';
 import templatePreview from './admin/template-preview';
+import designPreview from './public/design-preview';
 
 // Components are registered here and referenced by name from Blade, rather
 // than written inline in an x-data="..." attribute. A literal double quote
@@ -18,6 +19,7 @@ import templatePreview from './admin/template-preview';
 //     x-data="invitationForm(@js([...]))"
 Alpine.data('assetForm', assetForm);
 Alpine.data('copyButton', copyButton);
+Alpine.data('designPreview', designPreview);
 Alpine.data('invitationForm', invitationForm);
 Alpine.data('palettePicker', palettePicker);
 Alpine.data('settingsForm', settingsForm);

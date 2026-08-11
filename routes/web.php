@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\TemplatePreviewController;
 use App\Http\Controllers\Admin\TranslateController;
 use App\Http\Controllers\Auth\LoginController as CustomerLoginController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\DemoController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InvitationController;
 use Illuminate\Support\Facades\Route;
@@ -27,6 +28,11 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', HomeController::class)->name('home');
+
+// A design working, filled with invented details — framed in a phone on the
+// landing page and opened full-screen by "See it in action". The same page
+// both times, so what a visitor plays with is what they would be buying.
+Route::get('/demo/{template:slug}', DemoController::class)->name('templates.demo');
 
 // The guest-facing invitation. Read-only, unauthenticated, and 404s while the
 // invitation is unpublished.

@@ -134,45 +134,110 @@
                     @endif
                 </div>
 
-                <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <p class="mt-3 text-center text-xs text-ink-400">
+                    Hover a design to watch it open. Every one is filled with invented details.
+                </p>
+
+                <div class="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($designs as $design)
                         @php($p = $design->palette())
 
-                        <figure class="overflow-hidden rounded-2xl border border-ink-200 bg-white">
-                            {{-- The theme's own clip, muted and looping. It is
-                                 the product, so it is what the card shows —
-                                 and preload="none" keeps a page of six of
-                                 them from costing a visitor twenty megabytes
-                                 before they have scrolled to it. --}}
-                            <div class="aspect-[4/5] w-full overflow-hidden" style="background: {{ $p['curtain'] }}">
-                                <video
-                                    class="h-full w-full object-cover"
-                                    src="{{ $design->intro_video }}"
-                                    muted
-                                    loop
-                                    playsinline
-                                    autoplay
-                                    preload="none"
-                                    aria-label="{{ $design->name }}"
-                                ></video>
+                        <figure
+                            x-data="designPreview(@js(['url' => route('templates.demo', $design)]))"
+                            x-on:mouseenter="enter()"
+                            x-on:mouseleave="leave()"
+                            class="group flex flex-col items-center"
+                        >
+                            {{-- A phone, because that is what a guest opens it
+                                 on — and the frame is the real invitation
+                                 rather than a still of its clip, so what is on
+                                 show is the thing being sold.
+
+                                 375×812 is a real handset viewport, and the
+                                 design lays itself out from the height it is
+                                 given: it reads window.innerHeight to place
+                                 the names and to decide on its scroll cue. A
+                                 frame sized to fit this card rather than to
+                                 match a phone would get both wrong. --}}
+                            {{-- The numbers have to agree or the right edge
+                                 clips. The shell's 6px padding leaves 252px of
+                                 screen; 252/375 = 0.672, and 812 × 0.672 =
+                                 546. Fixed rather than fluid because a scale
+                                 factor cannot be derived from a percentage
+                                 width in CSS — calc() will not divide one
+                                 length by another into a bare number. --}}
+                            <div
+                                class="relative shrink-0 rounded-[2rem] bg-ink-950 p-[6px] shadow-lifted ring-1 ring-ink-950/40 transition-transform duration-500 group-hover:-translate-y-1"
+                                style="width: 264px;"
+                            >
+                                <div
+                                    class="relative overflow-hidden rounded-[1.65rem]"
+                                    style="background: {{ $p['curtain'] }}; width: 252px; height: 546px;"
+                                >
+                                    <iframe
+                                        x-ref="frame"
+                                        x-on:load="onLoad()"
+                                        title="{{ $design->name }} — a sample invitation"
+                                        loading="lazy"
+                                        tabindex="-1"
+                                        scrolling="no"
+                                        class="pointer-events-none absolute left-0 top-0 origin-top-left border-0"
+                                        style="width: 375px; height: 812px; transform: scale(0.672);"
+                                        sandbox="allow-scripts allow-same-origin"
+                                    ></iframe>
+
+                                    {{-- Until the frame is up, the theme's own
+                                         backdrop colour holds the space — so
+                                         the card never flashes white and never
+                                         changes size. --}}
+                                    <div
+                                        x-show="! ready"
+                                        class="absolute inset-0 grid place-items-center"
+                                        style="background: {{ $p['curtain'] }}"
+                                    >
+                                        <span
+                                            class="h-6 w-6 animate-pulse rounded-full"
+                                            style="background: {{ $p['gold'] }}"
+                                            aria-hidden="true"
+                                        ></span>
+                                    </div>
+                                </div>
                             </div>
 
-                            <figcaption class="flex items-center justify-between gap-3 px-5 py-4">
-                                <div class="min-w-0">
-                                    <p class="truncate text-sm font-medium text-ink-900">{{ $design->name }}</p>
-                                    <p class="truncate text-xs text-ink-500">{{ $design->baseTemplateLabel() }}</p>
+                            <figcaption class="mt-5 w-[264px] max-w-full">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="truncate text-sm font-medium text-ink-900">{{ $design->name }}</p>
+                                        <p class="truncate text-xs text-ink-500">{{ $design->baseTemplateLabel() }}</p>
+                                    </div>
+
+                                    {{-- The palette, which is the part a couple
+                                         actually chooses between. --}}
+                                    <div class="flex shrink-0 gap-1" aria-hidden="true">
+                                        @foreach (['paper', 'gold', 'gold_deep', 'ink'] as $role)
+                                            <span
+                                                class="h-4 w-4 rounded-full ring-1 ring-black/10"
+                                                style="background: {{ $p[$role] ?? '#ffffff' }}"
+                                            ></span>
+                                        @endforeach
+                                    </div>
                                 </div>
 
-                                {{-- The theme's palette, which is the part a
-                                     couple actually chooses between. --}}
-                                <div class="flex shrink-0 gap-1" aria-hidden="true">
-                                    @foreach (['paper', 'gold', 'gold_deep', 'ink'] as $role)
-                                        <span
-                                            class="h-4 w-4 rounded-full ring-1 ring-black/10"
-                                            style="background: {{ $p[$role] ?? '#ffffff' }}"
-                                        ></span>
-                                    @endforeach
-                                </div>
+                                {{-- The frame itself takes no pointer events —
+                                     hovering it drives the tour, and a stray
+                                     click inside would open a link with no way
+                                     back. This is the way in. --}}
+                                <x-ui.button
+                                    :href="route('templates.demo', $design)"
+                                    variant="secondary"
+                                    size="sm"
+                                    class="mt-3 w-full justify-center"
+                                    target="_blank"
+                                    rel="noopener"
+                                    icon="arrow-top-right-on-square"
+                                >
+                                    See it in action
+                                </x-ui.button>
                             </figcaption>
                         </figure>
                     @endforeach
