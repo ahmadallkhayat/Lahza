@@ -903,7 +903,58 @@ footer {
   opacity: .75;
 }
 
+/* ─── REDUCED MOTION ──────────────────────────────────────────────
+   Take the movement away, and leave the invitation.
+
+   This used to be the usual blanket — every transition and animation on
+   the page forced to .01ms with !important — and on an invitation that is
+   almost entirely a timed reveal, that does not make it calmer, it makes
+   it a jump cut. The envelope snapped open, the names appeared already
+   placed, the whole sequence arrived at once. Worse, being a `*` rule with
+   !important it also overrode the careful reduced-motion handling further
+   up, so the envelope's gentle dissolve never got a chance to run.
+
+   The preference is about vestibular triggers: travel, parallax, spin,
+   things that loop forever in the corner of the eye. It is not about
+   crossfades, which are the accepted way to show a change to someone who
+   has asked not to be moved. So movement goes and fades stay, and the
+   sequence still reads as a sequence.
+
+   The large motion is already refused in JavaScript — the petals, the
+   ambient backdrop and the scroll peek all check this same preference and
+   do not start. What is left here is the CSS that would otherwise still
+   travel. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  /* Content arrives by fading in where it belongs, rather than rising
+     into place. The opacity transition is deliberately left alone. */
+  main > *,
+  main.revealed > * {
+    transform: none !important;
+  }
+
+  /* The names stay where they will end up instead of being lifted onto
+     the clip and travelling back down. They still lead — they simply
+     lead from their own position. */
+  main.names-in:not(.revealed) .couple {
+    transform: none !important;
+  }
+
+  /* The clip's own scale is deliberately left alone. It is not motion —
+     it is there so the blur has material to bleed from and cannot show a
+     soft edge at the viewport — and taking it away would trade a 12%
+     one-shot zoom for a visible seam around the whole screen for the rest
+     of the visit. The ambient backdrop it belongs to is already refused
+     outright in JavaScript under this preference.
+
+     Anything that loops for as long as the page is open. A pulse in the
+     corner of the eye is the clearest case the preference exists for. */
+  #loading .mark,
+  #loading .pulse i,
+  .ring::after,
+  #more svg,
+  .petal,
+  .petal i {
+    animation: none !important;
+  }
 }
 </style>
