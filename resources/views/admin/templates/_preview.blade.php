@@ -19,39 +19,103 @@
 >
     <x-ui.card title="Live preview">
         <div class="flex flex-col items-center">
-            {{-- Phone-shaped, because that is what a guest opens it on.
-
-                 The frame renders at 375px — a real phone viewport — then
-                 scales down to fit the rail. Narrowing the iframe itself
-                 would lay the invitation out at a width no phone has, so
-                 the preview would stop being representative.
-
-                 The numbers have to agree or the right edge gets clipped.
-                 The shell is border-box, so its 6px border leaves 252×532
-                 of content; 252/375 = 0.672, and 532/0.672 = 792. --}}
-            <div
-                class="relative shrink-0 overflow-hidden rounded-[1.5rem] border-[6px] border-ink-800 bg-ink-900 shadow-lifted"
-                style="width: 264px; height: 544px;"
-            >
-                {{-- allow="autoplay" is what lets the music play at all: a
-                     frame is not granted the autoplay permission by
-                     default, so play() was rejected even though the tap
-                     inside it is a real user gesture. --}}
-                <iframe
-                    x-ref="frame"
-                    title="Invitation preview"
-                    class="block border-0 bg-white"
-                    style="width: 375px; height: 792px; transform: scale(0.672); transform-origin: top left;"
-                    sandbox="allow-scripts allow-same-origin"
-                    allow="autoplay; encrypted-media"
-                ></iframe>
-
-                <div
-                    x-show="loading"
-                    x-cloak
-                    class="absolute inset-0 grid place-items-center bg-ink-900/70 text-xs text-white"
+            <div class="mb-3 w-full">
+                <select
+                    x-model="deviceId"
+                    x-on:change="chooseDevice()"
+                    class="w-full rounded-lg border-ink-300 py-1.5 text-xs text-ink-700 focus:border-brand-500 focus:ring-brand-500"
+                    aria-label="Preview device"
                 >
-                    Rendering…
+                    <template x-for="d in devices" :key="d.id">
+                        <option
+                            :value="d.id"
+                            x-text="`${d.label} — ${d.w}×${d.h}`"
+                        ></option>
+                    </template>
+                </select>
+            </div>
+
+            {{-- The stage is what the shell is measured against, so the phone
+                 tracks the rail's width rather than a number guessed here. --}}
+            <div x-ref="stage" class="flex w-full justify-center">
+                {{-- Phone-shaped, because that is what a guest opens it on.
+
+                     The frame is the chosen device's real viewport and is
+                     scaled down to fit; the shell is sized from it. Doing it
+                     the other way round — fitting the frame to the rail — lays
+                     the invitation out at a size no handset has, and the
+                     design reads window.innerHeight to place the names and to
+                     decide on the scroll cue, so both come out wrong. --}}
+                <div
+                    class="relative shrink-0 bg-ink-950 shadow-lifted ring-1 ring-ink-950/40"
+                    :style="`
+                        width: ${viewport.w * scale + 12}px;
+                        height: ${viewport.h * scale + 12}px;
+                        padding: 6px;
+                        border-radius: ${device.radius * scale + 6}px;
+                    `"
+                >
+                    <div
+                        class="relative overflow-hidden bg-black"
+                        :style="`
+                            width: ${viewport.w * scale}px;
+                            height: ${viewport.h * scale}px;
+                            border-radius: ${device.radius * scale}px;
+                        `"
+                    >
+                        {{-- allow="autoplay" is what lets the music play at
+                             all: a frame is not granted the autoplay
+                             permission by default, so play() was rejected even
+                             though the tap inside it is a real user gesture.
+
+                             Sized to the device and scaled from the top left,
+                             so what renders inside is a true viewport. --}}
+                        <iframe
+                            x-ref="frame"
+                            title="Invitation preview"
+                            class="block border-0 bg-white"
+                            :style="`
+                                width: ${viewport.w}px;
+                                height: ${viewport.h}px;
+                                transform: scale(${scale});
+                                transform-origin: top left;
+                            `"
+                            sandbox="allow-scripts allow-same-origin"
+                            allow="autoplay; encrypted-media"
+                        ></iframe>
+
+                        {{-- Chrome, not layout. The design sets
+                             viewport-fit=cover and takes no env() insets, so
+                             on a real handset its content does run under both
+                             of these — drawing them is what the guest sees. --}}
+                        <div
+                            x-show="device.notch && ! landscape"
+                            x-cloak
+                            aria-hidden="true"
+                            class="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded-b-2xl bg-ink-950"
+                            :style="`width: ${120 * scale}px; height: ${30 * scale}px;`"
+                        ></div>
+
+                        <div
+                            x-show="device.indicator"
+                            x-cloak
+                            aria-hidden="true"
+                            class="pointer-events-none absolute left-1/2 -translate-x-1/2 rounded-full bg-white/70"
+                            :style="`
+                                bottom: ${8 * scale}px;
+                                width: ${130 * scale}px;
+                                height: ${4 * scale}px;
+                            `"
+                        ></div>
+
+                        <div
+                            x-show="loading"
+                            x-cloak
+                            class="absolute inset-0 grid place-items-center bg-ink-900/70 text-xs text-white"
+                        >
+                            Rendering…
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -73,18 +137,31 @@
                     </select>
                 @endif
 
-                {{-- With no language picker beside it the button would sit
-                     alone against the left edge, so it takes the row. --}}
                 <x-ui.button
                     type="button"
                     variant="secondary"
                     size="sm"
                     icon="arrow-path"
-                    class="{{ $multilingual ? 'shrink-0' : 'w-full justify-center' }}"
+                    class="shrink-0"
                     x-bind:disabled="loading"
                     x-on:click="render()"
                 >
                     Replay
+                </x-ui.button>
+
+                {{-- Guests do turn their phones, and the reveal is laid out
+                     off the viewport's height — so landscape is a different
+                     render, not the same one rotated. --}}
+                <x-ui.button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    class="{{ $multilingual ? 'shrink-0' : 'flex-1 justify-center' }}"
+                    x-bind:disabled="loading"
+                    x-on:click="rotate()"
+                    x-bind:aria-pressed="landscape ? 'true' : 'false'"
+                >
+                    <span x-text="landscape ? 'Portrait' : 'Landscape'"></span>
                 </x-ui.button>
             </div>
 
@@ -98,6 +175,6 @@
             <p class="mt-1 w-full text-xs leading-relaxed text-ink-500">
                 Tap to play the intro, as a guest would. Colours update live; media and timings re-render.
             </p>
-    </div>
+        </div>
     </x-ui.card>
 </div>

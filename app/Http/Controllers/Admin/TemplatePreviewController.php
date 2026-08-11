@@ -32,12 +32,26 @@ class TemplatePreviewController extends Controller
         // admin page with status 200 — which the preview then rendered inside
         // its own frame, showing the studio a copy of the page it was already
         // looking at. A failure here must always be a status, never a redirect.
-        $validator = Validator::make($request->all(), [
+        $validator = Validator::make($this->normalised($request), [
             'base_template' => ['required', Rule::in(array_keys(BaseTemplates::available()))],
             'palette' => ['array'],
             'palette.*' => ['nullable', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'settings' => ['array'],
-            'settings.*' => ['nullable', 'numeric'],
+
+            // Not `numeric`, which is what this was: a design may declare a
+            // setting that is a name rather than a number — an opening style,
+            // say — and rejecting it took the whole preview down with a 422
+            // for every theme built on that design.
+            //
+            // Deliberately loose about *value* as well as type. These arrive
+            // mid-keystroke, so a half-typed "9" on its way to "900" must not
+            // blank the frame the studio is watching. Nothing unsafe gets
+            // through by being permissive here: Template::settings() keeps
+            // only keys the design declares, casts its numbers with (int) and
+            // (float), and falls a choice back to the default unless it is one
+            // the design actually offers — so no string in this array can
+            // reach the stylesheet or the page intact.
+            'settings.*' => ['nullable', 'string', 'max:64'],
 
             // Media is referenced, never fetched by us. A file chosen but not
             // yet uploaded arrives as a blob: URL the browser made, which only
@@ -72,6 +86,32 @@ class TemplatePreviewController extends Controller
             // be cached, indexed, or embedded anywhere but this form.
             ->header('Cache-Control', 'no-store')
             ->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    /**
+     * The request as one shape, whatever sent it.
+     *
+     * A browser's FormData sends every setting as a string; a caller posting
+     * JSON may send real numbers. Rather than give the rule below a type
+     * union — which would have to accept both and so could assert neither —
+     * scalars are flattened to strings here and anything that is not a scalar
+     * becomes null, so a nested array cannot slip past a rule that only knows
+     * how to reject strings.
+     *
+     * @return array<string, mixed>
+     */
+    private function normalised(Request $request): array
+    {
+        $input = $request->all();
+
+        if (is_array($input['settings'] ?? null)) {
+            $input['settings'] = array_map(
+                fn ($value) => is_scalar($value) ? (string) $value : null,
+                $input['settings'],
+            );
+        }
+
+        return $input;
     }
 
     /**

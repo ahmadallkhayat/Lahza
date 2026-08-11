@@ -128,6 +128,57 @@ class TemplatePreviewTest extends TestCase
         $this->assertStringContainsString('"crossfadeMs":900', $html);
     }
 
+    /**
+     * Regression: settings.* was validated as `numeric`, so the moment a
+     * design declared one that is a name rather than a number — the opening
+     * style — every preview of every theme on that design answered 422 and
+     * the frame went blank. A setting's type belongs to the design that
+     * declared it, and the preview cannot assume they are all numbers.
+     */
+    public function test_a_setting_that_is_a_name_does_not_break_the_preview(): void
+    {
+        $html = $this->post('/admin/templates/preview', $this->payload([
+            'settings' => ['opening' => 'veil', 'crossfadeMs' => '1400'],
+        ]))->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-opening="veil"', $html);
+    }
+
+    /**
+     * Being loose about the value is safe because the model is not.
+     *
+     * These arrive mid-keystroke, so the endpoint must not 422 on a
+     * half-typed number — but nothing a form can put in this array may reach
+     * the stylesheet. A number gets cast, and a choice the design does not
+     * offer falls back to the one it does.
+     */
+    public function test_junk_settings_cannot_reach_the_page(): void
+    {
+        $html = $this->post('/admin/templates/preview', $this->payload([
+            'settings' => [
+                'crossfadeMs' => 'red; background:url(javascript:alert(1))',
+                'opening' => 'trapdoor',
+            ],
+        ]))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('javascript:alert(1)', $html);
+        $this->assertStringNotContainsString('trapdoor', $html);
+
+        // Cast to a number and fallen back to a declared opening.
+        $this->assertMatchesRegularExpression('/--fade:\s*0ms/', $html);
+        $this->assertStringContainsString('data-opening="envelope"', $html);
+    }
+
+    /** A setting the chosen design never declared is simply not rendered. */
+    public function test_a_setting_the_design_does_not_declare_is_ignored(): void
+    {
+        $html = $this->post('/admin/templates/preview', $this->payload([
+            'settings' => ['somethingElseMs' => '4000'],
+        ]))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('somethingElseMs', $html);
+    }
+
     public function test_nothing_is_persisted(): void
     {
         $this->post('/admin/templates/preview', $this->payload([
