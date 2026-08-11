@@ -206,6 +206,11 @@ body::before {
   inset: 0;
   transform-style: preserve-3d;
   pointer-events: none;
+
+  /* How far down the flap's point reaches. Both shapes below are cut from
+     this one number so their edges cannot drift apart and leave a seam of
+     doubled tint, or a gap of bare clip, along the join. */
+  --flap: 58%;
 }
 
 .env-pocket,
@@ -222,35 +227,46 @@ body::before {
     );
 }
 
-/* The body of the envelope, covering the whole screen. It does not fold —
-   it settles downward and dissolves, which is what selling the flap as the
-   thing that moved depends on. */
+/* The body of the envelope: the whole screen *except* the triangle the flap
+   covers, so the two tile exactly rather than stack.
+
+   The notch is the fix for an envelope that looked right and did not open.
+   The pocket used to be a plain full-screen panel sitting behind the flap in
+   the same tint, so folding the flap back uncovered something identical to
+   the flap — the motion was real and completely invisible, and the opening
+   read as the screen simply fading out when the pocket finally went. With
+   the triangle cut out, folding the flap reveals the clip behind it, which
+   is the whole gesture. */
 .env-pocket {
   top: 0;
   bottom: 0;
+  clip-path: polygon(0 0, 50% var(--flap), 100% 0, 100% 100%, 0 100%);
   transition:
     opacity calc(var(--open) * .75) var(--ease-soft),
     transform calc(var(--open) * .75) var(--ease-soft);
 }
 
-/* The flap: a triangle hinged along the top edge.
+/* The flap: a triangle hinged along the top edge, filling that notch.
 
    drop-shadow rather than a border, because a border follows the element's
    box and this shape is a clip-path — only a filter traces the cut edge, so
-   this is what draws the gold seam down both diagonals. */
+   this is what draws the gold seam down both diagonals.
+
+   No backface-visibility: hidden. It made the flap blink out of existence
+   the instant it passed 90°, which reads as a dropped frame rather than as
+   paper — and paper is the one thing this is meant to look like. */
 .env-flap {
   top: 0;
-  height: 58%;
+  height: var(--flap);
   clip-path: polygon(0 0, 100% 0, 50% 100%);
   transform-origin: top center;
-  backface-visibility: hidden;
   filter: drop-shadow(0 1px 0 color-mix(in srgb, var(--gold) 45%, transparent));
   transition: transform var(--open) cubic-bezier(.62, .02, .2, 1);
 }
 
 /* Opened: the flap swings back over the top edge, the pocket falls away.
-   Just short of a half turn — a flat 180° lands edge-on and disappears for
-   a frame, which reads as a glitch rather than a fold. */
+   Just short of a half turn — a flat 180° lands exactly edge-on, which is
+   zero pixels wide for a frame and reads as a glitch rather than a fold. */
 #curtain.opened .env-flap { transform: rotateX(-168deg); }
 
 #curtain.opened .env-pocket {

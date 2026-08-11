@@ -197,6 +197,19 @@ let veiled = false;
 
 function veil() {
     if (veiled || !intro) return;
+
+    /* Never after the tap.
+
+       This is the bug that left the whole clip blurred for its entire run.
+       The frame only has to arrive before the guest taps for the ordinary
+       path to work, and on a slow connection it does not: armPrompt also
+       fires on the loader timeout, so the tap can land first, and then
+       loadeddata turns up afterwards and veils a clip that is already
+       playing. `.veiled` carries the blur and sits below `.playing` in the
+       stylesheet, so it wins — and nothing takes it off again, because the
+       only thing that does is the tap that already happened. */
+    if (opened) return;
+
     veiled = true;
 
     intro.classList.add('veiled');
