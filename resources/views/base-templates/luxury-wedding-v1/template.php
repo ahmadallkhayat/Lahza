@@ -88,10 +88,14 @@ return [
             ],
         ],
 
+        /* Long enough to be a fold rather than a flicker.
+           1500 read as the cover being snatched away — and it doubles as the
+           clip's grace period, since the guest is watching the flap while the
+           video gets going underneath it. */
         'openingMs' => [
             'label' => 'Opening length',
             'hint' => 'ms for the envelope to open. Ignored by the veil.',
-            'default' => 1500,
+            'default' => 2600,
             'min' => 300,
             'max' => 6000,
         ],
@@ -199,6 +203,26 @@ return [
             'default' => 13000,
             'min' => 1000,
             'max' => 120000,
+        ],
+
+        /* ── The peek ─────────────────────────────────────────────────
+           Once everything has arrived the page lifts a little and settles
+           back, so the fold below the screen is something the guest has
+           seen rather than something the cue has to claim. */
+        'scrollHintPx' => [
+            'label' => 'Scroll hint',
+            'hint' => 'How far the page lifts to show there is more. 0 turns it off.',
+            'default' => 72,
+            'min' => 0,
+            'max' => 300,
+        ],
+
+        'scrollHintDelayMs' => [
+            'label' => 'Scroll hint delay',
+            'hint' => 'ms after the invitation lands before the page peeks.',
+            'default' => 1400,
+            'min' => 0,
+            'max' => 20000,
         ],
 
         // Unlabelled, so the studio never sees them — both are this design's

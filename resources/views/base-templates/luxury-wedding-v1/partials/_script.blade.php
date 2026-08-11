@@ -193,6 +193,31 @@ function armPrompt() {
    the curtain's own colour belongs. HAVE_CURRENT_DATA is the level that
    means there is a frame decoded to show — anything less and this would
    be asking the compositor to blur nothing. */
+/* ── buffering while they look ──────────────────────────────────────
+   The clip is marked preload="metadata" so the page becomes interactive
+   without waiting for a several-megabyte download. That is right for the
+   first paint and wrong for the tap: a guest who taps promptly does it
+   against a clip with almost nothing buffered, and the envelope opens onto
+   a frame that has not started moving yet.
+
+   The wait is the answer to it. Once metadata is in, there is a held frame
+   on screen and a prompt to read, and that time can be spent fetching
+   rather than idle — so preload is raised to auto and the clip keeps
+   loading behind the veil.
+
+   The property alone, never load(): load() restarts the fetch from nothing
+   and throws away the very frame the veil is showing. */
+function deepen() {
+    if (!intro || intro.preload === 'auto') return;
+
+    intro.preload = 'auto';
+}
+
+if (intro) {
+    if (intro.readyState >= 1) deepen();
+    else intro.addEventListener('loadedmetadata', deepen, { once: true });
+}
+
 let veiled = false;
 
 function veil() {
@@ -386,6 +411,65 @@ function armScrollCue() {
 
         window.addEventListener('scroll', dismiss, { once: true, passive: true });
     });
+}
+
+/* ── the peek ───────────────────────────────────────────────────────
+   Once everything has arrived, the page lifts a little and settles back.
+
+   An invitation opens on a full screen of names and verse with the fold
+   well below it, and nothing about a still page says there is more under
+   it — the cue says so in words, and words are read after movement is
+   noticed, not before. So the page shows rather than tells: it moves just
+   far enough that the eye registers travel, and returns, which leaves the
+   names exactly where they were rather than scrolling the guest off them.
+
+   Then the cue, and not before. Arming it first would have the peek's own
+   scroll event dismiss it a frame later — the hint would take the cue away
+   with it, and the one guest who missed the movement would be left with
+   neither.
+
+   Real intent cancels it outright: wheel and touchstart, not scroll, since
+   the peek itself is a scroll and cannot be told from one. */
+function peekThenCue() {
+    const room = document.documentElement.scrollHeight - window.innerHeight;
+    const distance = Math.min(CONFIG.scrollHintPx, room);
+
+    if (
+        distance < 8
+        || matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+        armScrollCue();
+
+        return;
+    }
+
+    let cancelled = false;
+
+    const cancel = () => {
+        if (cancelled) return;
+        cancelled = true;
+
+        // Whatever they are doing now is better than a hint, so stop moving
+        // and let the cue stand for the rest.
+        armScrollCue();
+    };
+
+    window.addEventListener('wheel', cancel, { once: true, passive: true });
+    window.addEventListener('touchstart', cancel, { once: true, passive: true });
+
+    window.scrollTo({ top: distance, behavior: 'smooth' });
+
+    setTimeout(() => {
+        if (cancelled) return;
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        setTimeout(() => {
+            if (cancelled) return;
+
+            armScrollCue();
+        }, 700);
+    }, 900);
 }
 
 /* ── petals ─────────────────────────────────────────────────────────
@@ -616,7 +700,11 @@ function showContent() {
     settleMusic();
     release();
     startPetals();
-    armScrollCue();
+
+    // After the content has had a moment to finish arriving — the sections
+    // stagger in, and peeking through that would read as the page lurching
+    // rather than as an invitation to scroll.
+    setTimeout(peekThenCue, CONFIG.scrollHintDelayMs);
 }
 
 /* ── language switching ─────────────────────────────────────────
